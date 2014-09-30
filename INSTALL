@@ -1,0 +1,13 @@
+# Ubuntu
+sudo apt-get -y install curl dig php5-cli
+git clone git://github.com/cloudharmony/network.git
+
+
+# CentOS
+sudo yum -y install curl dig php-cli
+git clone git://github.com/cloudharmony/network.git
+
+
+# Setup BigQuery (see save.sh)
+curl https://sdk.cloud.google.com | bash
+gcloud auth login
