@@ -34,6 +34,8 @@
   {"name": "metric_stdev", "type": "float"},
   {"name": "metric_sum", "type": "float"},
   {"name": "metric_sum_squares", "type": "float"},
+  {"name": "metric_unit", "type": "char(8)"},
+  {"name": "metric_unit_long", "type": "char(32)"},
   {"name": "samples", "type": "tinyint unsigned"},
   {"name": "status", "type": "char(8)"},
   {"name": "test", "type": "char(12)"},

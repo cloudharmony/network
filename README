@@ -61,9 +61,9 @@ are informational and used in conjunction with saving results (see save.sh)
                             including associated countries/states. Default for 
                             this parameter is:
                             
-                            us_east us_west us_central eu_west eu_central 
-                            eu_east oceania asia_apac asia america_north 
-                            america_central america_south africa
+                            us_west us_central us_east canada 
+                            eu_west eu_central eu_east 
+                            oceania asia america_south africa
                             
                             Geo region associations are based on first match.
                             For example, based on the default value above, 
@@ -505,6 +505,8 @@ metric_slowest: [slowest metric - highest value for dns/latency, lowest for othe
 metric_stdev: [sample standard deviation]
 metric_sum: [summation of individual measurements]
 metric_sum_squares: [summation of squared individual measurements]
+metric_unit: [unit of measure for the metrics - e.g. ms or Mb/s]
+metric_unit_long: [long form unit of measure for the metrics - e.g. milliseconds or megabits per second]
 samples: [number of test samples]
 status: [test status - success, partial or failed]
 test: [type of test: dns, latency, uplink or downlink]

@@ -140,9 +140,9 @@ class BenchmarkDb {
                                 'db_librato_value:',
                                 'db_mysql_engine:', 'db_name:', 
                                 'db_port:', 'db_pswd:', 'db_prefix:', 
-                                'db_suffix:', 'db_user:', 'output:', 'remove:', 
-                                'store:', 'v' => 'verbose'), 
-                          array('db_librato_aggregate', 
+                                'db_suffix:', 'db_user:', 'output:', 'params_file:', 
+                                'remove:', 'skip_validations', 'store:', 'v' => 'verbose'), 
+                          $aparams = array('db_librato_aggregate', 
                                 'db_librato_color', 'db_librato_count',
                                 'db_librato_description',
                                 'db_librato_display_max', 
@@ -159,18 +159,30 @@ class BenchmarkDb {
                                 'db_librato_sum_squares', 'db_librato_type',
                                 'db_librato_value', 'remove'), 
                           'save_');
-    // default table suffix
-    if (!isset($options['db_suffix']) && ($ini = get_benchmark_ini()) && isset($ini['meta-version'])) $options['db_suffix'] = '_' . str_replace('.', '_', $ini['meta-version']);
-    merge_options_with_config($options, BenchmarkDb::BENCHMARK_DB_CONFIG_FILE);
-    if (!isset($options['remove'])) $options['remove'] = array();
-    // explode remove options specified in config
-    if (!is_array($options['remove'])) {
-      $remove = array();
-      foreach(explode(',', $options['remove']) as $r) $remove[] = trim($r);
-      $options['remove'] = $remove;
+    
+    // merge settings with config file
+    $cfile = BenchmarkDb::BENCHMARK_DB_CONFIG_FILE;
+    if (isset($options['params_file']) && !file_exists($options['params_file']) && 
+        !file_exists($options['params_file'] = trim(shell_exec('pwd')) . '/' . $options['params_file'])) print_msg(sprintf('--params_file %s is not a valid file', $options['params_file']), TRUE, __FILE__, __LINE__, TRUE);
+    else if (isset($options['params_file'])) $cfile = $options['params_file'];
+    merge_options_with_config($options, $cfile);
+    // convert array parameters found in config file
+    foreach($aparams as $aparam) {
+      if (isset($options[$aparam]) && !is_array($options[$aparam])) {
+        $p = array();
+        foreach(explode(',', $options[$aparam]) as $v) {
+          foreach(explode(' ', trim($v)) as $v) $p[] = trim($v);
+        }
+        $options[$aparam] = $p;
+      }
     }
+    
+    if (!isset($options['remove'])) $options['remove'] = array();
     // output directory
     if (!isset($options['output'])) $options['output'] = trim(shell_exec('pwd'));
+    
+    // default table suffix
+    if (!isset($options['db_suffix']) && ($ini = get_benchmark_ini()) && isset($ini['meta-version'])) $options['db_suffix'] = '_' . str_replace('.', '_', $ini['meta-version']);
     
     $impl = 'BenchmarkDb';
     if (isset($options['db'])) {
@@ -204,8 +216,9 @@ class BenchmarkDb {
     
     $db = new $impl($options);
     $db->options = $options;
+    $db->dir = $options['output'];
     if (!$db->validateDependencies()) $db = NULL;
-    else if (!$db->validate()) $db = NULL;
+    else if (!isset($options['skip_validations']) && !$db->validate()) $db = NULL;
     
     if ($db && isset($options['store'])) {
       require_once('BenchmarkArchiver.php');
@@ -250,7 +263,22 @@ class BenchmarkDb {
         foreach(array_keys($this->schemas[$table]) as $col) if (preg_match('/^ss_/', $col)) unset($this->schemas[$table][$col]);
       }
       ksort($this->schemas[$table]); 
+      // move indexes to the end and remove columns if they are no longer in the schema
+      $indexes = array();
+      foreach(array_keys($this->schemas[$table]) as $key) {
+        if (isset($this->schemas[$table][$key]['type']) && $this->schemas[$table][$key]['type'] == 'index') {
+          $indexes[$key] = $this->schemas[$table][$key];
+          unset($this->schemas[$table][$key]);
+        }
+      }
+      $cols = array_keys($this->schemas[$table]);
+      
+      foreach($indexes as $key => $index) {
+        if ($index['cols'] = array_intersect($index['cols'], $cols)) $this->schemas[$table][$key] = $index;
+        else print_msg(sprintf('Removing index %s because it all of the columns associated with it have been removed from the schema', $key), isset($this->options['verbose']), __FILE__, __LINE__);
+      }
     }
+    
     return $this->schemas[$table];
   }
   
@@ -382,7 +410,6 @@ class BenchmarkDb {
       else if (!is_writable($dir)) print_msg(sprintf('%s is not writable', $dir), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
       else {
         print_msg(sprintf('Set output directory to %s', $dir), isset($this->options['verbose']), __FILE__, __LINE__);
-        $this->dir = $dir;
         $this->valid = TRUE;
       } 
     }

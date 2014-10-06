@@ -50,6 +50,10 @@ class BenchmarkDbLibrato extends BenchmarkDb {
   protected function importCsv($table, $rows, $schema) {
     $imported = FALSE;
     
+    // default type is gauge
+    if (!isset($this->options['db_librato_type'])) $this->options['db_librato_type'] = array();
+    if (!$this->options['db_librato_type']) $this->options['db_librato_type'][] = 'gauge';
+    
     $request = array();
     $sources = array();
     $measureTimes = array();
@@ -117,7 +121,7 @@ class BenchmarkDbLibrato extends BenchmarkDb {
                 case 'db_librato_summarize_function':
                   if ($type == 'gauge' || ($param != 'db_librato_aggregate' && $param != 'db_librato_summarize_function')) {
                     if (!isset($record['attributes'])) $record['attributes'] = array();
-                    $record['attributes'][str_replace('db_librato_', '', $param)] = $param == 'db_librato_display_stacked' || $param == 'db_librato_aggregate' ? TRUE : $pval; 
+                    $record['attributes'][str_replace('db_librato_', '', $param)] = $param == 'db_librato_display_stacked' || $param == 'db_librato_aggregate' ? TRUE : (isset($row[$pval]) ? $row[$pval] : $pval);
                   }
                   break;
               }
@@ -249,11 +253,7 @@ class BenchmarkDbLibrato extends BenchmarkDb {
         }
       }
       
-      if ($this->valid) {
-        // default type is gauge
-        if (!isset($this->options['db_librato_type'])) $this->options['db_librato_type'] = array();
-        if (!$this->options['db_librato_type']) $this->options['db_librato_type'][] = 'gauge';
-        
+      if ($this->valid) {        
         // validate credentials using GET request
         $curl = ch_curl(self::LIBRATO_METRICS_API_URL, 'GET', NULL, NULL, sprintf('%s:%s', $this->options['db_user'], $this->options['db_pswd']), '200-299', TRUE);
         $this->valid = ($response = json_decode($curl, TRUE)) ? TRUE : FALSE;

@@ -21,7 +21,19 @@
 require_once(dirname(__FILE__) . '/NetworkTest.php');
 require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
 $status = 1;
-$args = parse_args(array('iteration:', 'nostore_traceroute', 'v' => 'verbose'));
+$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'v' => 'verbose'), array('params_file'));
+
+// save to multiple repositories (multiple --params_file parameters)
+if (isset($args['params_file']) && count($args['params_file']) > 1) {
+  $cmd = __FILE__;
+  for($i=1; $i<count($argv); $i++) if ($argv[$i] != '--params_file' && !in_array($argv[$i], $args['params_file'])) $cmd .= ' ' . $argv[$i]; 
+  foreach($args['params_file'] as $pfile) {
+    $pcmd = sprintf('%s --params_file %s', $cmd, $pfile);
+    print($pcmd . "\n\n");
+    passthru($pcmd);
+  }
+  exit;
+}
 
 // get result directories => each directory stores 1 iteration of results
 $dirs = array();

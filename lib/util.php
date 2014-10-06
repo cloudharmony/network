@@ -533,7 +533,7 @@ function merge_options_with_config(&$options, $config) {
   foreach(explode("\n", shell_exec('cat ' . $config . ' 2>/dev/null')) as $line) {
     if (substr(trim($line), 0, 1) == '#') continue;
     if (preg_match('/([A-Za-z_]+)\s*=?\s*(.*)$/', $line, $m) && !isset($options[$key = strtolower($m[1])])) {
-      print_msg(sprintf('Added option %s=%s from config %s', $key, $m[2], $config), isset($options['verbose']), __FILE__, __LINE__);
+      print_msg(sprintf('Added option %s=%s from config %s', $key, preg_match('/pswd/', $key) || preg_match('/key/', $key) ? '***' : $m[2], $config), isset($options['verbose']), __FILE__, __LINE__);
       $options[$key] = $m[2] ? trim($m[2]) : TRUE;
     }
   }

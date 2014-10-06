@@ -29,7 +29,8 @@ results (1 for non-numbered directories).
 
 By default results are written to CSV files in 'pwd'. These arguments below may
 be set to modify default CSV saving. These arguments may also be set in a 
-line delimited config file located in ~/.ch_benchmark (e.g. db_host=localhost)
+line delimited config file located in ~/.ch_benchmark (e.g. db_host=localhost).
+This path can be overriden using the --params_file parameter (see below)
 
 --db                        Save results to a database instead of CSV files.
                             The following argument values are supported:
@@ -127,12 +128,14 @@ the others are not repeated, they will be applied to all submissions
                             
 --db_librato_display_units_long A string that identifies the unit of 
                             measurement e.g. Microseconds. Used in 
-                            visualizations e.g. the Y-axis label on a graph
+                            visualizations e.g. the Y-axis label on a graph. 
+                            Alternatively, this can be the name of a column
                             
 --db_librato_display_units_short A terse (usually abbreviated) string that 
                             identifies the unit of measurement e.g. uS 
                             (Microseconds). Used in visualizations e.g. the 
-                            tooltip for a point on a graph
+                            tooltip for a point on a graph. Alternatively, this 
+                            can be the name of a column
                             
 --db_librato_display_stacked A boolean value indicating whether or not multiple 
                             sources for a metric should be aggregated in a 
@@ -283,11 +286,21 @@ the others are not repeated, they will be applied to all submissions
                             If not specified, the current working directory 
                             will be used
                             
+--params_file               Path to an explicit file containing save parameters
+                            Parameters in this file should be line delimited 
+                            using the format [param]=[value] where [param]
+                            is any of the parameters defined here. This 
+                            parameter may also be repeated for multiple save 
+                            executions (i.e. saving to multiple repositories)
+                            
 --remove                    One or more columns to remove from the saved output
                             (CSV files or tables). This argument may be 
                             repeated for multiple columns. To define multiple 
                             values in ~/.ch_benchmark, use one line and comma
                             separated values. Wildcards are supported
+                            
+--skip_validations          Skip database and store validations - improves 
+                            performance but can cause unexpected errors
                             
 --store                     Save result artifacts to object storage. The 
                             following argument values are supported:

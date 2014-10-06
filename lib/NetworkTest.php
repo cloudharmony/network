@@ -268,7 +268,7 @@ class NetworkTest {
           'dns_retry' => 2,
           'dns_samples' => 10,
           'dns_timeout' => 5,
-          'geo_regions' => 'us_east us_west us_central eu_west eu_central eu_east oceania asia_apac asia america_north america_central america_south africa',
+          'geo_regions' => 'us_west us_central us_east canada eu_west eu_central eu_east oceania asia america_south africa',
           'latency_samples' => 10,
           'latency_timeout' => 3,
           'meta_cpu' => $sysInfo['cpu'],
@@ -715,6 +715,8 @@ class NetworkTest {
             $row['metric_rstdev'] = round(($row['metric_stdev']/$row['metric'])*100, 4);
             $row['metric_sum'] = array_sum($row['metrics']);
             $row['metric_sum_squares'] = get_sum_squares($row['metrics']);
+            $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
+            $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
             $row['samples'] = count($row['metrics']);
             $row['status'] = $status;
             print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
@@ -809,7 +811,7 @@ class NetworkTest {
             $metric = NULL;
             $lookup = str_replace('*', rand(), $endpoint);
             $cmd = sprintf('dig +short +%stcp +time=%d%s +%srecurse @%s %s', isset($this->options['dns_tcp']) ? '' : 'no', $timeout, !isset($this->options['dns_tcp']) && $retries != 2 ? ' +retry=' . $retries : '', isset($this->options['dns_recursive']) ? '' : 'no', $nameserver, $lookup);
-            print_msg(sprintf('Performing DNS query for hostname %s using name server %s [%s]', $lookup, $nameserver, $cmd), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('Performing DNS query %d of %d for hostname %s using name server %s [%s]', count($metrics) + 1, $samples, $lookup, $nameserver, $cmd), $this->verbose, __FILE__, __LINE__);
             $start = microtime(TRUE);
             if (preg_match('/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/', $buffer = trim(exec($cmd . ' 2>/dev/null')), $m)) {
               $metric = round((microtime(TRUE) - $start)*1000, 3);

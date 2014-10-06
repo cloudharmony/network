@@ -44,8 +44,16 @@ abstract class BenchmarkArchiver {
   public static function &getArchiver() {
     $archiver = NULL;
     $options = parse_args(array('store:', 'store_container:', 'store_endpoint:', 'store_insecure', 'store_key:', 'store_prefix:', 'store_public', 'store_region:', 'store_secret:', 'v' => 'verbose'), NULL, 'save_');
-    merge_options_with_config($options, BenchmarkDb::BENCHMARK_DB_CONFIG_FILE);
+    
+    // merge settings with config file
+    $cfile = BenchmarkDb::BENCHMARK_DB_CONFIG_FILE;
+    if (isset($options['params_file']) && !file_exists($options['params_file']) && 
+        !file_exists($options['params_file'] = trim(shell_exec('pwd')) . '/' . $options['params_file'])) print_msg(sprintf('--params_file %s is not a valid file', $options['params_file']), TRUE, __FILE__, __LINE__, TRUE);
+    else if (isset($options['params_file'])) $cfile = $options['params_file'];
+    merge_options_with_config($options, $cfile);
+    
     $impl = 'BenchmarkArchiver';
+    if (!isset($options['store'])) $options['store'] = '';
     switch($options['store']) {
       case 'azure':
         $impl .= 'Azure';
