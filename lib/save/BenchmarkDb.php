@@ -10,7 +10,7 @@
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// See the License for the specific langauge governing permissions and
 // limitations under the License.
 
 
@@ -64,6 +64,18 @@ class BenchmarkDb {
   public $tablePrefix = '';
   
   /**
+   * used to track the results from the validate function
+   */
+  private $valid;
+  
+  /**
+   * if set to FALSE by implementing classes, the method signature for
+   * importCsv($table, $csv, $schema) will be changed to 
+   * importCsv($table, $rows, $schema)
+   */
+  protected $writeCsv = TRUE;
+  
+  /**
    * Constructor is protected to implement the singleton pattern using 
    * the BenchmarkDb::getDb static method
    * @param array $options db command line arguments
@@ -109,7 +121,44 @@ class BenchmarkDb {
    */
   public static function &getDb() {
     $db = NULL;
-    $options = parse_args(array('db:', 'db_and_csv:', 'db_callback_header:', 'db_host:', 'db_mysql_engine:', 'db_name:', 'db_port:', 'db_pswd:', 'db_prefix:', 'db_suffix:', 'db_user:', 'output:', 'remove:', 'store:', 'v' => 'verbose'), array('remove'), 'save_');
+    $options = parse_args(array('db:', 'db_and_csv:', 'db_callback_header:', 
+                                'db_host:', 'db_librato_aggregate', 
+                                'db_librato_color:', 'db_librato_count:',
+                                'db_librato_description:',
+                                'db_librato_display_max:', 
+                                'db_librato_display_min:',
+                                'db_librato_display_name:',
+                                'db_librato_display_units_long:',
+                                'db_librato_display_units_short:',
+                                'db_librato_display_stacked',
+                                'db_librato_display_transform:',
+                                'db_librato_max:', 'db_librato_min:',
+                                'db_librato_measure_time:', 'db_librato_name:',
+                                'db_librato_period:', 'db_librato_source:', 
+                                'db_librato_sum:', 'db_librato_summarize_function:',
+                                'db_librato_sum_squares:', 'db_librato_type:',
+                                'db_librato_value:',
+                                'db_mysql_engine:', 'db_name:', 
+                                'db_port:', 'db_pswd:', 'db_prefix:', 
+                                'db_suffix:', 'db_user:', 'output:', 'remove:', 
+                                'store:', 'v' => 'verbose'), 
+                          array('db_librato_aggregate', 
+                                'db_librato_color', 'db_librato_count',
+                                'db_librato_description',
+                                'db_librato_display_max', 
+                                'db_librato_display_min',
+                                'db_librato_display_name',
+                                'db_librato_display_units_long',
+                                'db_librato_display_units_short',
+                                'db_librato_display_stacked',
+                                'db_librato_display_transform',
+                                'db_librato_max', 'db_librato_min',
+                                'db_librato_measure_time', 'db_librato_name',
+                                'db_librato_period', 'db_librato_source', 
+                                'db_librato_sum', 'db_librato_summarize_function',
+                                'db_librato_sum_squares', 'db_librato_type',
+                                'db_librato_value', 'remove'), 
+                          'save_');
     // default table suffix
     if (!isset($options['db_suffix']) && ($ini = get_benchmark_ini()) && isset($ini['meta-version'])) $options['db_suffix'] = '_' . str_replace('.', '_', $ini['meta-version']);
     merge_options_with_config($options, BenchmarkDb::BENCHMARK_DB_CONFIG_FILE);
@@ -120,6 +169,8 @@ class BenchmarkDb {
       foreach(explode(',', $options['remove']) as $r) $remove[] = trim($r);
       $options['remove'] = $remove;
     }
+    // output directory
+    if (!isset($options['output'])) $options['output'] = trim(shell_exec('pwd'));
     
     $impl = 'BenchmarkDb';
     if (isset($options['db'])) {
@@ -129,6 +180,9 @@ class BenchmarkDb {
           break;
         case 'callback':
           $impl .= 'Callback';
+          break;
+        case 'librato':
+          $impl .= 'Librato';
           break;
         case 'mysql':
           $impl .= 'MySql';
@@ -168,7 +222,7 @@ class BenchmarkDb {
    * @param string $table the table to get the schema for
    * @return array
    */
-  protected final function getSchema($table) {
+  public final function getSchema($table) {
     if (!isset($this->schemas[$table])) {
       $this->schemas[$table] = array();
       $files = array(sprintf('%s/schema/common.json', dirname(__FILE__)), sprintf('%s/schema/%s.json', dirname(__FILE__), $table));
@@ -216,7 +270,9 @@ class BenchmarkDb {
    * this method should be overriden by sub-classes to import CSV data into the 
    * underlying datastore. It should return TRUE on success, FALSE otherwise
    * @param string $table the name of the table to import to
-   * @param string $csv the CSV file to import
+   * @param string $csv the CSV file to import. If the instance attribute 
+   * $writeCsv is set to FALSE, this parameter will change to an array of rows
+   * each with the same column name indeces as $schema
    * @param array $schema the table schema
    * @return boolean
    */
@@ -235,17 +291,26 @@ class BenchmarkDb {
         $csv = sprintf('%s/%s.csv', $this->dir, $table);
         $fp = fopen($csv, 'w');
         print_msg(sprintf('Saving %d rows to CSV file %s', count($this->rows[$table]), basename($csv)), isset($this->options['verbose']), __FILE__, __LINE__);
+        
         $schema = $this->getSchema($table);
+        
+        // write headers
         foreach(array_keys($schema) as $i => $col) if ($schema[$col]['type'] != 'index') fwrite($fp, sprintf('%s%s', $i > 0 ? ',' : '', $col));
         fwrite($fp, "\n");
+        
         foreach($this->rows[$table] as $row) {
-          foreach(array_keys($schema) as $i => $col) if ($schema[$col]['type'] != 'index') fwrite($fp, sprintf('%s%s', $i > 0 ? ',' : '', isset($row[$col]) ? (strpos($row[$col], ',') ? '"' . str_replace('"', '\"', $row[$col]) . '"' : $row[$col]) : ''));
+          foreach(array_keys($schema) as $i => $col) {
+            if ($schema[$col]['type'] != 'index') {
+              fwrite($fp, sprintf('%s%s', $i > 0 ? ',' : '', isset($row[$col]) ? (strpos($row[$col], ',') ? '"' . str_replace('"', '\"', $row[$col]) . '"' : $row[$col]) : ''));
+            }
+          }
           fwrite($fp, "\n");
         }
         fclose($fp);
+        
         if (isset($this->options['db'])) {
-          if ($this->importCsv($table, $csv, $schema)) {
-            print_msg(sprintf('Successfully imported CSV to table %s in %s db', $table, $this->options['db']), isset($this->options['verbose']), __FILE__, __LINE__);
+          if ($this->importCsv($table, $this->writeCsv ? $csv : $this->rows[$table], $schema)) {
+            print_msg(sprintf('Successfully imported data to table %s in %s db', $table, $this->options['db']), isset($this->options['verbose']), __FILE__, __LINE__);
             if (!isset($this->options['db_and_csv']) || !$this->options['db_and_csv']) {
               exec(sprintf('rm -f %s', $csv));
               print_msg(sprintf('Deleted CSV file %s', $csv), isset($this->options['verbose']), __FILE__, __LINE__);
@@ -281,21 +346,47 @@ class BenchmarkDb {
   }
   
   /**
+   * this method substitutes any tokens present in $str the the corresponding 
+   * benchmark or row metadata. Benchmark metata tokens include {benchmark} and
+   * {version}
+   * @param string $str the string containing tokens
+   * @param array $row the data row (hash of key/value pairs)
+   * @return string
+   */
+  protected function substituteTokens($str, &$row) {
+    if (preg_match_all('/\{([^\}]+)\}/', $str, $m)) {
+      if (!isset($this->benchmarkIni)) $this->benchmarkIni = get_benchmark_ini();
+      $meta = array('benchmark' => isset($this->benchmarkIni['meta-id']) ? $this->benchmarkIni['meta-id'] : NULL,
+                    'version' => isset($this->benchmarkIni['meta-version']) ? $this->benchmarkIni['meta-version'] : NULL);
+      foreach($m[1] as $i => $token) {
+        $sub = '';
+        if (isset($row[$token])) $sub = $row[$token];
+        else if (isset($meta[$token])) $sub = $meta[$token];
+        $str = str_replace($m[0][$i], $sub, $str);
+      }
+    }
+    return $str;
+  }
+  
+  /**
    * validation method - may be overriden by sub-classes, but parent method 
    * should still be invoked. returns TRUE if db options are valid, FALSE 
    * otherwise
    * @return boolean
    */
   protected function validate() {
-    $valid = FALSE;
-    $dir = isset($this->options['output']) ? $this->options['output'] : trim(shell_exec('pwd'));
-    if (!is_dir($dir)) print_msg(sprintf('%s is not a valid output directory', $dir), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
-    else if (!is_writable($dir)) print_msg(sprintf('%s is not writable', $dir), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
-    else {
-      $this->dir = $dir;
-      $valid = TRUE;
+    if (!isset($this->valid)) {
+      $this->valid = FALSE;
+      $dir = $this->options['output'];
+      if (!is_dir($dir)) print_msg(sprintf('%s is not a valid output directory', $dir), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
+      else if (!is_writable($dir)) print_msg(sprintf('%s is not writable', $dir), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
+      else {
+        print_msg(sprintf('Set output directory to %s', $dir), isset($this->options['verbose']), __FILE__, __LINE__);
+        $this->dir = $dir;
+        $this->valid = TRUE;
+      } 
     }
-    return $valid;
+    return $this->valid;
   }
   
   /**
@@ -311,6 +402,7 @@ class BenchmarkDb {
           $dependencies['bq'] = 'Google Cloud SDK';
           break;
         case 'callback':
+        case 'librato':
           $dependencies['curl'] = 'curl';
           break;
         case 'mysql':

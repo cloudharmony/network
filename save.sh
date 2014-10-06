@@ -10,7 +10,7 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+# See the License for the specific langauge governing permissions and
 # limitations under the License.
 
 if [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
@@ -36,6 +36,8 @@ line delimited config file located in ~/.ch_benchmark (e.g. db_host=localhost)
                               bigquery   => save results to a Google BigQuery
                                             dataset
                               callback   => save results using an HTTP callback
+                              librato    => save results to Librato Metrics 
+                                            (see https://metrics.librato.com)
                               mysql      => save results to a MySQL db
                               postgresql => save results to a PostgreSQL db
                             For --db callback HTTP requests will be made to 
@@ -76,45 +78,200 @@ line delimited config file located in ~/.ch_benchmark (e.g. db_host=localhost)
                               db_name           => the --db_name argument value
                               table             => the table name (including 
                                                    --db_prefix)
-                                                   
+                            This parameter is not used for Librato Metrics
+                            
+Librato Metrics Parameters: the following parameters are specific to 
+--db librato only. More information about these parameters is available in the 
+Librato API documentation: http://dev.librato.com/v1/metric-attributes 
+http://dev.librato.com/v1/post/metrics and 
+http://dev.librato.com/v1/put/metrics/:name
+
+Each of these metrics may be repeated to submit to multiple gauges/counters. If
+multiple are set, the ordering of each will be used to distinguish their 
+properties. The only parameters that MUST be repeated are db_librato_name and
+db_librato_value (or db_librato_count + db_librato_sum in place of value). If 
+the others are not repeated, they will be applied to all submissions
+                            
+--db_librato_aggregate      Enable service-side aggregation for the Librato 
+                            Metrics gauge. Only applicable if the gauge does not 
+                            already exist
+                            
+--db_librato_color          Sets a default color to prefer when visually 
+                            rendering the metric. Must be a seven character 
+                            string that represents the hex code of the color 
+                            e.g. #52D74C
+                            
+--db_librato_count          Optional name of the column that designates the 
+                            number of samples for each test performed (gauge
+                            metrics only). Required if --db_librato_value is 
+                            not set. Cannot be used if --db_librato_value is 
+                            set
+                            
+--db_librato_description    Text that used to explain what a gauge is measuring.
+                            This parameter may also contain column name tokens 
+                            that will be replaced by actual test values. The 
+                            format for these is {column_name}
+                            
+--db_librato_display_max    If a metric has a known theoretical maximum value, 
+                            set this so the visualizations can provide 
+                            perspective of the current values relative to the 
+                            maximum value
+                            
+--db_librato_display_min    If a metric has a known theoretical minimum value, 
+                            set this so that visualizations can provide 
+                            perspective of the current values relative to the 
+                            minimum value
+                            
+--db_librato_display_name   Name which will be used for the metric when viewing 
+                            the Metrics website
+                            
+--db_librato_display_units_long A string that identifies the unit of 
+                            measurement e.g. Microseconds. Used in 
+                            visualizations e.g. the Y-axis label on a graph
+                            
+--db_librato_display_units_short A terse (usually abbreviated) string that 
+                            identifies the unit of measurement e.g. uS 
+                            (Microseconds). Used in visualizations e.g. the 
+                            tooltip for a point on a graph
+                            
+--db_librato_display_stacked A boolean value indicating whether or not multiple 
+                            sources for a metric should be aggregated in a 
+                            visualization (e.g. stacked graphs). By default 
+                            counters have display_stacked enabled while gauges 
+                            have it disabled
+                            
+--db_librato_display_transform A linear formula that is run on each measurement 
+                            prior to visualization. Useful for translating 
+                            between different units (e.g. Fahrenheit -> Celsius) 
+                            or scales (e.g. Microseconds -> Milliseconds). The 
+                            formula may only contain: numeric characters, 
+                            whitespace, parentheses, the letter x, and approved 
+                            mathematical operators ('+', '-', '', '/'). The 
+                            regular expression used is /^[\dxp()+-\/ ]+$/
+                            
+--db_librato_max            If --db_librato_count was set, this parameter should 
+                            designate the name of the column containing the 
+                            largest individual measurement. Cannot be used if 
+                            --db_librato_value is set
+                            
+--db_librato_min            If --db_librato_count was set, this parameter should 
+                            designate the name of the column containing the 
+                            smallest individual measurement. Cannot be used if 
+                            --db_librato_value is set
+                            
+--db_librato_measure_time   Optional name of the column containing a parsable 
+                            date string to associate with each test result 
+                            (otherwise the time submitted is assumed)
+                            
+--db_librato_name           The unique identifying name of the property being 
+                            tracked. The metric name is used both to create new 
+                            measurements and query existing measurements. Must 
+                            be 255 or fewer characters, and may only consist of 
+                            'A-Za-z0-9.:-_'. This parameter may also contain 
+                            column name tokens that will be replaced by actual 
+                            test values. The format for these is {column_name}. 
+                            For example, the parameter
+                            "{meta_compute_service_id}-{meta_region}" might be
+                            replaced with "aws:ec2-us-east-1". The default 
+                            name is the name of the benchmark name + version
+                            + --db_prefix, --db_suffix (if specified). Tokens
+                            in this string may also include {benchmark} and 
+                            {version}
+                            
+--db_librato_period         Number of seconds that is the standard reporting 
+                            period of the metric. Setting the period enables 
+                            Metrics to detect abnormal interruptions in 
+                            reporting and aids in analytics. For gauge metrics 
+                            that have service-side aggregation enabled, this 
+                            option will define the period that aggregation 
+                            occurs on
+                            
+--db_librato_source         Optional string which describes the originating 
+                            source of a measurement when that measurement is 
+                            tracked across multiple members of a population. 
+                            Examples: foo.bar.com, user-123, 77025.
+                            
+                            Sources must be composed of 'A-Za-z0-9.:-_' and can 
+                            be up to 255 characters in length. The word all is 
+                            reserved and cannot be used as user source.
+                            
+                            This parameter may also contain column name tokens 
+                            that will be replaced by actual test values. The 
+                            format for these is {column_name}. For example, the 
+                            parameter "{meta_compute_service_id}-{meta_region}" 
+                            might be replaced with "aws:ec2-us-east-1"
+                            
+--db_librato_sum            If --db_librato_count was set, this MUST be set to 
+                            the name of the column containing the summation of 
+                            individual measurements. The combination of count 
+                            and sum are used to calculate an average value for 
+                            the recorded metric measurement. Cannot be used if 
+                            --db_librato_value is set
+                            
+--db_librato_summarize_function Determines how to calculate values when rolling 
+                            up from raw values to higher resolution intervals. 
+                            Must be one of: 'average', 'sum', 'count', 'min', 
+                            'max'. If summarize_function is not set the 
+                            behavior defaults to average
+                            
+--db_librato_sum_squares    If --db_librato_count was set, this may be set to 
+                            the name of the column containing the summation of 
+                            the squared individual measurements. If set, a 
+                            standard deviation can be calculated for the r
+                            ecorded metric measurement. Cannot be used if 
+                            --db_librato_value is set
+                            
+--db_librato_type           Type of metric to create (gauge or counter)
+                            
+--db_librato_value          the name of the column containing the value metric. 
+                            This must be a numeric value. Either this or a 
+                            combination of both --db_librato_count and 
+                            --db_librato_sum are REQUIRED
+                            
+                                                  
 --db_mysql_engine           An optional explicit storage engine to use when 
                             creating MySQL tables (i.e. if a table does not 
                             already exist). If not set, the default storage 
-                            engine will be used
+                            engine will be used. This parameter is only used 
+                            for MySQL
                             
 --db_name                   Name of the database where tables should be created 
                             and results stored. For Google BigQuery this should 
-                            be the dataset name
+                            be the dataset name. This parameter is not used for 
+                            Librato Metrics
                             
 --db_port                   If the --db argument is set, this argument 
                             specifies the database server port. Defaults is the
                             corresponding database server defaults (3306 for 
                             MySQL, 5432 for PostgreSQL, 80 for HTTP callbacks 
                             and 443 for HTTP callbacks). Not applicable to 
-                            Google BigQuery
+                            Google BigQuery. This parameter is not used for 
+                            Librato Metrics
                             
 --db_pswd                   If the --db argument is set, this argument 
                             specifies the database server password. Default is 
                             ''. Not applicable to Google BigQuery. HTTP AUTH
-                            password for --db callbacks
+                            password for --db callback, or API token for 
+                            Librato Metrics
                             
 --db_prefix                 If the --db argument is set, this argument 
                             specifies an optional prefix to use for the results
-                            table. Default table name is 'stream' with no 
-                            prefix
+                            table. Default table name is the benchmark name 
+                            with no prefix
                             
 --db_suffix                 If the --db argument is set, this argument 
                             specifies an optional suffix to use for the results
-                            table. Default table suffix is '_1_0'
+                            table. Default table suffix is the benchmark 
+                            version with periods replaced with underscores
                             
 --db_user                   If the --db argument is set, this argument 
                             specifies the database server username. Not 
                             applicable to Google BigQuery. HTTP AUTH user for 
-                            --db callbacks. For MySQL user needs create table,
-                            drop table, and load data infile permissions. For
-                            PostgreSQL, the permissions are the same except 
-                            that the user needs copy permissions in place of
-                            MySQL load data infile
+                            --db callbacks, user name for Librato Metrics. For 
+                            MySQL user needs create table, drop table, and 
+                            load data infile permissions. For PostgreSQL, the 
+                            permissions are the same except that the user needs 
+                            copy permissions in place of MySQL load data infile
                             
 --iteration                 Explicit iteration number for test results - 
                             otherwise 1 will be assumed unless results are in 
@@ -256,8 +413,14 @@ USAGE
 # save results to a PostgreSQL database
 ./save --db postgresql --db_user dbuser --db_pswd dbpass --db_host db.mydomain.com --db_name benchmarks
 
-# save results to BigQuery and artifacts (Triad PNG images) to S3
+# save results to BigQuery and artifacts to S3
 ./save --db bigquery --db_name benchmark_dataset --store s3 --store_key THISIH5TPISAEZIJFAKE --store_secret thisNoat1VCITCGggisOaJl3pxKmGu2HMKxxfake --store_container benchmarks1234
+
+# save results to Librato Metrics using the median metric and custom name/source
+save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_value metric
+
+# save results to Librato Metrics using count + sum and custom name/source and other attributes
+save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_count samples --db_librato_display_units_short ms --db_librato_max metric_max --db_librato_min metric_min --db_librato_measure_time test_stopped --db_librato_name "{benchmark}-{test}" --db_librato_period 300 --db_librato_source "{meta_geo_region}" --db_librato_sum metric_sum --db_librato_sum_squares metric_sum_squares
 
 
 EXIT CODES:

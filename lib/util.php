@@ -72,6 +72,129 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
 }
 
 /**
+ * invokes 1 or more http requests using curl, waits until they are completed, 
+ * and returns the associated results. Return value is a hash containing the 
+ * following keys:
+ *   urls:     ordered array of URLs
+ *   request:  ordered array of request headers (lowercase keys)
+ *   response: ordered array of response headers (lowercase keys)
+ *   results:  ordered array of curl result values - includes the following:
+ *             speed:              transfer rate (bytes/sec)
+ *             time:               total time for the operation
+ *             transfer:           total bytes transferred
+ *             url:                actual URL used
+ *   status:   ordered array of status codes
+ *   lowest_status: the lowest status code returned
+ *   highest_status: the highest status code returned
+ *   body:     response body (only included when $retBody is TRUE)
+ * returns NULL if any of the curl commands fail
+ * @param array $requests array defining the http requests to invoke. Each 
+ * element in this array is a hash with the following possible keys:
+ *   method:  http method (default is GET)
+ *   headers: hash defining http headers to append
+ *   url:     the URL
+ *   input:   optional command to pipe into the curl process as the body
+ *   body:    optional string or file to pipe into the curl process as the 
+ *            body. Alternatively, if this is a numeric value, a file will 
+ *            be created containing random bytes corresponding with the 
+ *            numeric value (created in $dir). This file will be deleted 
+ *            when the PHP process terminates
+ *   range:   optional request byte range
+ * @param int $timeout the max allowed time in seconds for each request (i.e. 
+ * --max-time). Default is 60. If < 1, no timeout will be set
+ * @param string $dir optional directory where temporary files should be 
+ * written to - /tmp if not specified
+ * @param boolean $retBody if TRUE, the response body will be included in the 
+ * return
+ * @param boolean $insecure bypass certificate validation
+ * @return array
+ */
+function ch_curl_mt($requests, $timeout=60, $dir='/tmp', $retBody=FALSE, $insecure=FALSE) {
+  $fstart = microtime(TRUE);
+  $script = sprintf('%s/%s', $dir, 'curl_script_' . rand());
+  $fp = fopen($script, 'w');
+  fwrite($fp, "#!/bin/sh\n");
+  $ifiles = array();
+  $ofiles = array();
+  $bfiles = array();
+  $result = array('urls' => array(), 'request' => array(), 'response' => array(), 'results' => array(), 'status' => array(), 'lowest_status' => 0, 'highest_status' => 0);
+  if ($retBody) $result['body'] = array();
+  foreach($requests as $i => $request) {
+    if (isset($request['body'])) {
+      if (file_exists($request['body'])) $file = $request['body'];
+      // create random file
+      else if (is_numeric($request['body']) && $request['body'] > 0) {
+        $file = sprintf('%s/curl_input_%d', $dir, $request['body']);
+        if (!file_exists($file)) {
+          exec(sprintf('dd if=/dev/urandom of=%s bs=%d count=1 2>/dev/null', $file, $request['body']));
+          if (file_exists($file) && filesize($file) != $request['body']) unlink($file);
+          if (file_exists($file)) register_shutdown_function('unlink', $file);
+          else $file = NULL;
+        }
+      }
+      else {
+        $ifiles[$i] = sprintf('%s/%s', $dir, 'curl_input_' . rand());
+        $f = fopen($ifiles[$i], 'w');
+        fwrite($f, $request['body']);
+        fclose($f); 
+        $file = $ifiles[$i];
+      }
+      $request['input'] = 'cat ' . $file;
+      $request['headers']['content-length'] = filesize($file);
+    }
+    if (!isset($request['headers'])) $request['headers'] = array();
+    $method = isset($request['method']) ? strtoupper($request['method']) : 'GET';
+    $body = '/dev/null';
+    if ($retBody) {
+      $bfiles[$i] = sprintf('%s/%s', $dir, 'curl_body_' . rand());
+      $body = $bfiles[$i];
+    }
+    $cmd = (isset($request['input']) ? $request['input'] . ' | curl --data-binary @-' : 'curl') . ($method == 'HEAD' ? ' -I' : '') . ' -s -o ' . $body . ' -D - -w "transfer=%{' . ($method == 'GET' ? 'size_download' : 'size_upload') . '}\nspeed=%{' . ($method == 'GET' ? 'speed_download' : 'speed_upload') . '}\ntime=%{time_total}\nurl=%{url_effective}" -X ' . $method . ($insecure ? ' --insecure' : '') . (is_numeric($timeout) && $timeout>0 ? ' --max-time ' . $timeout : '');
+    $result['request'][$i] = $request['headers'];
+    foreach($request['headers'] as $header => $val) $cmd .= sprintf(' -H "%s: %s"', $header, $val);
+    if (isset($request['range'])) $cmd .= ' -r ' . $request['range'];
+    $result['urls'][$i] = $request['url'];
+    $cmd .= sprintf(' "%s"', $request['url']);
+    $ofiles[$i] = sprintf('%s/%s', $dir, 'curl_output_' . rand());
+    fwrite($fp, sprintf("%s > %s 2>&1 &\n", $cmd, $ofiles[$i]));
+  }
+  fwrite($fp, "wait\n");
+  fclose($fp);
+  exec(sprintf('chmod 755 %s', $script));
+  $start = microtime(TRUE);
+  exec($script);
+  $curl_time = microtime(TRUE) - $start;
+  foreach(array_keys($requests) as $i) {
+    foreach(file($ofiles[$i]) as $line) {
+      // status code
+      if (preg_match('/HTTP[\S]+\s+([0-9]+)\s/', $line, $m)) {
+        $status = $m[1]*1;
+        $result['status'][$i] = $status;
+        if ($result['lowest_status'] === 0 || $status < $result['lowest_status']) $result['lowest_status'] = $status;
+        if ($status > $result['highest_status']) $result['highest_status'] = $status;
+      }
+      // response header
+      else if (preg_match('/^([^:]+):\s+"?([^"]+)"?$/', trim($line), $m)) $result['response'][$i][trim(strtolower($m[1]))] = $m[2];
+      // result value
+      else if (preg_match('/^([^=]+)=(.*)$/', trim($line), $m)) $result['results'][$i][trim(strtolower($m[1]))] = $m[2];
+      // body
+      if (isset($bfiles[$i]) && file_exists($bfiles[$i])) {
+        $result['body'][$i] = file_get_contents($bfiles[$i]);
+        unlink($bfiles[$i]);
+      }
+    }
+    unlink($ofiles[$i]);
+  }
+  foreach($ifiles as $ifile) unlink($ifile);
+  unlink($script);
+  if (!$result['highest_status']) {
+    $result = NULL;
+  }
+  
+  return $result;
+}
+
+/**
  * returns the country and state associated with $hostname if the geoiplookup
  * command is present and returns such information. return value is a hash with
  * 2 keys: country and state on success, NULL on failure
@@ -160,7 +283,7 @@ function get_hostname($url) {
 /**
  * returns the arithmetic mean value from an array of points
  * @param array $points an array of numeric data points
- * @param int $round desired rounding precision, default is 2
+ * @param int $round desired rounding precision, default is 4
  * @access public
  * @return float
  */
@@ -173,7 +296,7 @@ function get_mean($points, $round=4) {
 /**
  * returns the median value from an array of points
  * @param array $points an array of numeric data points
- * @param int $round desired rounding precision, default is 2
+ * @param int $round desired rounding precision, default is 4
  * @access public
  * @return float
  */
@@ -316,6 +439,19 @@ function get_std_dev($points, $type=1, $round=6) {
 	if ($type > 2) $stddev = 100 * ($stddev/$mean);
 	if ($round) $stddev = round($stddev, $round);
 	return $stddev;
+}
+
+/**
+ * returns the summation of squares of values in $points
+ * @param array $points an array of numeric data points
+ * @param int $round desired rounding precision, default is 4
+ * @access public
+ * @return float
+ */
+function get_sum_squares($points, $round=4) {
+  $sum = 0;
+  foreach($points as $point) $sum += ($point*$point);
+  return round($sum, $round);
 }
 
 /**
@@ -582,6 +718,23 @@ function strip_quotes($string) {
 }
 
 /**
+ * removes a percentage of values from the bottom and top of $points
+ * @param array $points an array of numeric data points
+ * @param int $bottom percentage of values in $points to remove from the bottom
+ * @param int $top percentage of values in $points to remove from the top
+ * @access public
+ * @return array
+ */
+function trim_points($points, $bottom=NULL, $top=NULL) {
+  if (($bottom > 0 && $bottom < 40) || ($top > 0 && $top < 40)) {
+    $numMetrics = count($points);
+    if (($bottom > 0 && $bottom < 40) && ($discard = round($numMetrics*($bottom*0.01)))) $points = array_slice($points, $discard);
+    if (($top > 0 && $top < 40) && ($discard = round($numMetrics*($top*0.01)))) $points = array_slice($points, 0, $discard*-1);
+  }
+  return $points; 
+}
+
+/**
  * validate that the cli commands in the $dependencies array are present. 
  * returns an array containing those commands that are not valid or an empty
  * array if they are all valid
@@ -608,6 +761,7 @@ function validate_dependencies($dependencies) {
  * @param array $validate validation hash - indexed by argument name where 
  * the value is a hash of validation constraints. The following constraints 
  * are supported:
+ *   color:    argument is a hex color
  *   min:      argument numeric and >= this value
  *   max:      argument numeric and <= this value
  *   option:   argument must be found in this value (array)
@@ -626,6 +780,9 @@ function validate_options($options, $validate) {
       foreach($vals as $val) {
         // printf("Validate --%s=%s using constraint %s\n", $arg, $val, $constraint);
         switch($constraint) {
+          case 'color':
+            if ($val && !preg_match('/^#[a-zA-Z0-9]{6}$/', $val)) $err = sprintf('%s is not a valid hex color (e.g. #ffffff)', $val);
+            break;
           case 'min':
           case 'max':
             if ($val && !is_numeric($val)) $err = sprintf('%s is not numeric', $val);

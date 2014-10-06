@@ -14,6 +14,14 @@ are informational and used in conjunction with saving results (see save.sh)
                             testing. If set and this number of failures is 
                             reached, testing will stop and no result metrics 
                             will be generated
+                            
+* discard_fastest           If set, this percentage of the fastest metrics will 
+                            be discarded prior to metric calculations (mean, 
+                            median, standard deviation)
+                            
+* discard_slowest           If set, this percentage of the slowest metrics will 
+                            be discarded prior to metric calculations (mean, 
+                            median, standard deviation)
 
 * dns_one_server            If set, only 1 (randomly selected) authoritative 
                             DNS server will be tested for each --test_endpoint 
@@ -23,16 +31,18 @@ are informational and used in conjunction with saving results (see save.sh)
                             DNS tests (uses the name servers in 
                             /etc/resolv.conf)
                             
+* dns_retry                 Optional explicit number of (UDP) DNS query retries
+                            (default is 2)
+                            
 * dns_samples               The number of test samples for DNS tests. Default 
                             is 10. DNS queries will be performed against 
-                            delegated (or explicit --test_dns parameters) DNS 
-                            servers in round robin order. If --dns_one_server
-                            is set, each test will use just 1 randomly selected
-                            server
+                            delegated servers in round robin order. If 
+                            --dns_one_server is set, each test will use just 1 
+                            randomly selected server
                             
 * dns_tcp                   Perform DNS tests with TCP queries (default is UDP)
                             
-* dns_timeout:              Timeout in seconds for DNS queries. Default is 30 
+* dns_timeout:              Timeout in seconds for DNS queries. Default is 5 
                             seconds
                             
 * geoiplookup               Get --test_endpoint locations using a geoiplookup
@@ -93,7 +103,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             instance performing tests. This parameter may be 
                             either a two character ISO 3166 country code, or a 
                             state abbreviation and country code. (e.g. 
-                            --meta_location "CA, US" or --meta_location US')
+                            --meta_location "CA, US" or --meta_location US)
                             
 * meta_memory               Memory description - if not specified, the system
                             memory size will be used
@@ -147,13 +157,16 @@ are informational and used in conjunction with saving results (see save.sh)
                             
 * same_continent_only:      If set, only --test_endpoint hosts located in the 
                             same continent will be tested (others are skipped)
+                            Does not apply to CDN or DNS services
                             
 * same_country_only:        If set, only --test_endpoint hosts located in the 
                             same country will be tested (others are skipped)
+                            Does not apply to CDN or DNS services
                             
 * same_geo_region           If set, only --test_endpoint hosts located in the 
                             same geo region will be tested (others are skipped)
-                            See --geo_regions parameter above
+                            See --geo_regions parameter above. Does not apply 
+                            to CDN or DNS services
 
 * same_provider_only:       If set, only --test_endpoint hosts from the same 
                             provider (e.g. aws) will be tested (others are 
@@ -169,7 +182,7 @@ are informational and used in conjunction with saving results (see save.sh)
 
 * same_state_only:          If set, only --test_endpoint hosts located in the 
                             same country and state will be tested (others are 
-                            skipped)
+                            skipped). Does not apply to CDN or DNS services
                             
 * service_lookup            If set, the CloudHarmony 'Identify Service' API 
                             method will be used to attempt to correlate 
@@ -180,7 +193,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             NOTE: if used, response will be cached in /tmp
                             
 * spacing                   Spacing in milliseconds to apply between each 
-                            test (default is 500 ms => 1/2 second)
+                            test (default is 200 ms => 1/5 second)
                             
 * suppress_failed           If set, failed tests will be excluded from results 
                             generated by save.sh. Otherwise, they are included 
@@ -257,7 +270,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             value for this parameter may be either a two 
                             character ISO 3166 country code, or a state 
                             abbreviation and country code. (e.g. 
-                            --meta_location "CA, US" or --meta_location US')
+                            --meta_location "CA, US" or --meta_location US)
                             If multiple --test_endpoint parameters are specified, 
                             --test_location may be set only once (same location 
                             for all endpoints), or the same number of times as 
@@ -320,7 +333,18 @@ are informational and used in conjunction with saving results (see save.sh)
                             values are allowed: compute, storage (i.e. object 
                             storage), cdn or dns. Not required for DNS tests. 
                             Optionally, the service type can be imbedded into 
-                            --test_service_id (e.g. google:compute)
+                            --test_service_id (e.g. google:compute). If used 
+                            this attribute will also be used to determine which
+                            --test are supported by each endpoint based on the 
+                            following type to test correlations:
+                            
+                              compute => throughput, latency
+                              storage => downlink, latency
+                              cdn     => downlink, latency
+                              dns     => dns
+                            
+                            If an endpoint is specified for which there are no
+                            supported tests, it will be disregarded
 
 * throughput_https          If set, the protocol for throughput tests will 
                             default to https - otherwise it defaults to http
@@ -328,20 +352,23 @@ are informational and used in conjunction with saving results (see save.sh)
 * throughput_same_continent Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 
                             continent as --test_endpoint. Overrides 
-                            --throughput_size in that case
+                            --throughput_size in that case. CDN services will 
+                            always match this parameter
                             Default is 10
                             
 * throughput_same_country   Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 
                             country as --test_endpoint. Overrides 
-                            --throughput_size in that case
+                            --throughput_size in that case. CDN services will 
+                            always match this parameter
                             Default is 20
                             
 * throughput_same_geo_region Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 
                             geo region as --test_endpoint. Overrides 
                             --throughput_size in that case (see --geo_regions 
-                            parameter above)
+                            parameter above). CDN services will always match 
+                            this parameter
                             Default is 30
                             
 * throughput_same_provider  Throughput test size to use in megabytes if the 
@@ -369,7 +396,9 @@ are informational and used in conjunction with saving results (see save.sh)
                             Default is 50
                             
 * throughput_samples        The number of test samples for throughput tests. 
-                            Default is 10. Total number of test samples is
+                            Default is 5 unless --throughput_small_file is set
+                            or --throughput_size is 0, in which case it is 10. 
+                            Total number of test samples is 
                             [throughput_samples] * [throughput_threads]
                             
 * throughput_size           Default size for throughput tests in megabytes. 
@@ -378,13 +407,29 @@ are informational and used in conjunction with saving results (see save.sh)
                             closest matching size will be used. For uplink 
                             throughput tests, POST requests of this exact size 
                             (request body containing random data) will be used.
+                            If set to 0, tests will use an 8 byte request and 
+                            --throughput_time will be set to true (result 
+                            metrics will represent request times in ms instead 
+                            of rates in Mb/s)
                             Default is 5
+                            
+* throughput_small_file     If set, --throughput_size is ignored and throughput 
+                            tests are constrained to test files smaller than 
+                            256KB. Each thread of each request will randomly 
+                            select one such file. When used, the 
+                            throughput_size result value will be the average 
+                            file size
                             
 * throughput_threads        The number of concurrent threads for throughput 
                             tests. Default is 2
                             
+* throughput_time           If set, throughput metrics will be request times 
+                            (ms) instead of rates (Mb/s)
+                            
 * throughput_timeout:       Timeout in seconds for throughput tests. Default is
-                            120 seconds
+                            180 seconds unless --throughput_size is 0 or 
+                            --throughput_small_file is set in which case it is
+                            5
                             
 * throughput_uri            Defines the base URI/location of the http/https 
                             accessible CloudHarmony web-probe directory on 
@@ -393,9 +438,8 @@ are informational and used in conjunction with saving results (see save.sh)
                             --test_endpoint
                             
 * traceroute                Perform a traceroute if a test fails - results of 
-                            the traceroutes are written to 
-                            traceroute-[host]-[test].log in the --output 
-                            directory
+                            the traceroutes are written to traceroute.log in 
+                            the --output directory
                             
 * verbose                   Show verbose output
 
@@ -416,7 +460,7 @@ This benchmark has the following dependencies:
 TEST ARTIFACTS
 This benchmark generates the following artifacts (written to --output)
 
-traceroute-[host]-[test].log traceroute for [host] and [test] (if test failed)
+traceroute.log => traceroutes for any failed tests
 
 
 SAVE SCHEMA
@@ -427,7 +471,6 @@ in save/schema/network.json. Columns can be removed using the save.sh --remove
 parameter
 
 benchmark_version: [benchmark version]
-dns_custom: [true if --test_dns used instead of delegated DNS servers]
 dns_recursive
 dns_servers: [number of unique DNS servers queried]
 iteration: [iteration number (used with incremental result directories)]
@@ -450,17 +493,25 @@ meta_region*
 meta_resource_id
 meta_run_id
 meta_test_id*
-metric: [mean test metric: ms for latency and DNS, Mb/s for throughput]
-metric_10: [10th percentile metric]
-metric_90: [90th percentile metric]
-metric_median: [median metric]
+metric: [median test metric: ms for latency and DNS, Mb/s or ms for throughput]
+metric_10: [10th (slowest to fastest) percentile metric]
+metric_90: [90th (slowest to fastest) percentile metric]
+metric_fastest: [fastest metric - lowest value for dns/latency, highest for others]
+metric_max: [largest metric]
+metric_mean: [mean metric]
+metric_min: [smallest metric]
+metric_rstdev: [sample relative standard deviation %: (metric_stdev/metric)*100]
+metric_slowest: [slowest metric - highest value for dns/latency, lowest for others]
 metric_stdev: [sample standard deviation]
+metric_sum: [summation of individual measurements]
+metric_sum_squares: [summation of squared individual measurements]
 samples: [number of test samples]
 status: [test status - success, partial or failed]
 test: [type of test: dns, latency, uplink or downlink]
-test_endpoint: [IP/hostname of the test endpoint - private hostname/IP if used]
-test_instance_id*
+test_endpoint: [user designated IP/hostname of the test endpoint - private hostname/IP if used]
 test_geo_region*: geo region of the test endpoint
+test_instance_id*
+test_ip: [actual IP of the test_endpoint]
 test_location
 test_location_country
 test_location_state
@@ -474,8 +525,12 @@ test_service_id*
 test_service_type
 test_started*: [when the test started]
 test_stopped: [when the test ended]
+tests_failed: [number of failed test samples]
+tests_success: [number of successful test samples]
 throughput_https: [true if throughput test was over https]
 throughput_size: [throughput test size for each sample in megabytes]
+throughput_time: [true if throughput metrics are based on request times (ms) instead of transfer rate (Mb/s)]
+throughput_transfer: [total transfer for throughput tests in MB]
 throughput_threads
 timeout: [test timeout]
 traceroute: [URL to traceroute - if status is failed (if --store option used)]

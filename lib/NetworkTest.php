@@ -30,6 +30,12 @@ class NetworkTest {
   const NETWORK_TEST_OPTIONS_FILE_NAME = '.options';
   
   /**
+   * the max size in bytes for small file tests (see --throughput_small_file)
+   * 256KB
+   */
+  const SMALL_FILE_LIMIT = 262144;
+  
+  /**
    * set to TRUE if abort_threshold reached
    */
   private $aborted = FALSE;
@@ -50,6 +56,11 @@ class NetworkTest {
   private $dir;
   
   /**
+   * stores a reference to config/downlink-files.ini
+   */
+  private $dowlinkFiles;
+  
+  /**
    * hash of geo regions
    */
   private $geoRegions;
@@ -64,6 +75,11 @@ class NetworkTest {
    */
   private $results = array();
   
+  /**
+   * used to track which traceroutes have been performed
+   */
+  private $traceroutes = array();
+  
   
   /**
    * constructor
@@ -73,6 +89,42 @@ class NetworkTest {
    */
   public function NetworkTest($dir=NULL) {
     $this->dir = $dir;
+  }
+  
+  /**
+   * returns a hash containing 2 elements:
+   *   name: the name of a test downlink file that is closest in $size
+   *   size: the size of this file in bytes
+   * @param int $size the desired size (bytes)
+   * @param string $serviceType optional service type => CDNs will only get 
+   * image or javascript test files
+   * @return string
+   */
+  private function getDownlinkFile($size, $serviceType=NULL) {
+    if (!isset($this->dowlinkFiles)) {
+      $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
+    }
+    $dfile = NULL;
+    $ddiff = NULL;
+    $dsize = NULL;
+    foreach($this->dowlinkFiles as $f => $s) {
+      $diff = abs($size - $s);
+      if ($ddiff === NULL || $diff < $ddiff) {
+        if ($serviceType == 'cdn') {
+          $pieces = explode('.', $f);
+          $ext = $pieces[count($pieces) - 1];
+          if (!in_array($ext, array('png', 'jpg', 'gif', 'js'))) {
+            print_msg(sprintf('Skiping test file %s of type %s because it is not supported on CDNs', $f, $ext), $this->verbose, __FILE__, __LINE__);
+            continue;
+          }
+        }
+        $ddiff = $diff;
+        $dfile = $f;
+        $dsize = $s;
+      }
+    }
+    print_msg(sprintf('Selected downlink file %s [%s MB] for size %s MB', $dfile, round(($dsize/1024)/1024, 2), round(($size/1024)/1024, 2)), $this->verbose, __FILE__, __LINE__);
+    return $dfile ? array('name' => $dfile, 'size' => $dsize) : NULL;
   }
   
   /**
@@ -178,8 +230,25 @@ class NetworkTest {
    * @return array
    */
   public function getResults() {
-    $this->getRunOptions();
-    return isset($this->options['results']) ? $this->options['results'] : NULL;
+    $results = NULL;
+    require_once(sprintf('%s/save/BenchmarkDb.php', dirname(__FILE__)));
+    if ($db =& BenchmarkDb::getDb()) {
+      $this->getRunOptions();
+      if ($results = isset($this->options['results']) ? $this->options['results'] : NULL) {
+        $schema = $db->getSchema('network');
+        foreach(array_keys($this->options) as $key) {
+          if (isset($schema[$key]) && preg_match('/^meta/', $key)) {
+            foreach(array_keys($results) as $i) {
+              if (!isset($results[$i][$key])) {
+                $results[$i][$key] = trim(is_array($this->options[$key]) ? implode(' ', $this->options[$key]) : $this->options[$key]);
+                if (!$results[$i][$key]) unset($results[$i][$key]);
+              }
+            }
+          }
+        }
+      } 
+    }
+    return $results;
   }
   
   /**
@@ -196,8 +265,9 @@ class NetworkTest {
         // default run argument values
         $sysInfo = get_sys_info();
         $defaults = array(
+          'dns_retry' => 2,
           'dns_samples' => 10,
-          'dns_timeout' => 30,
+          'dns_timeout' => 5,
           'geo_regions' => 'us_east us_west us_central eu_west eu_central eu_east oceania asia_apac asia america_north america_central america_south africa',
           'latency_samples' => 10,
           'latency_timeout' => 3,
@@ -205,7 +275,7 @@ class NetworkTest {
           'meta_memory' => $sysInfo['memory_gb'] > 0 ? $sysInfo['memory_gb'] . ' GB' : $sysInfo['memory_mb'] . ' MB',
           'meta_os' => $sysInfo['os_info'],
           'output' => trim(shell_exec('pwd')),
-          'spacing' => 500,
+          'spacing' => 200,
           'test' => 'latency',
           'throughput_same_continent' => 10,
           'throughput_same_country' => 20,
@@ -213,15 +283,16 @@ class NetworkTest {
           'throughput_same_provider' => 10,
           'throughput_same_region' => 100,
           'throughput_same_state' => 50,
-          'throughput_samples' => 10,
           'throughput_size' => 5,
           'throughput_threads' => 2,
-          'throughput_timeout' => 120,
           'throughput_uri' => '/web-probe'
         );
         $opts = array(
           'abort_threshold:',
+          'discard_fastest:',
+          'discard_slowest:',
           'dns_one_server',
+          'dns_retry:',
           'dns_samples:',
           'dns_tcp',
           'dns_timeout:',
@@ -281,7 +352,9 @@ class NetworkTest {
           'throughput_same_state:',
           'throughput_samples:',
           'throughput_size:',
+          'throughput_small_file',
           'throughput_threads:',
+          'throughput_time',
           'throughput_timeout:',
           'throughput_uri:',
           'traceroute',
@@ -296,6 +369,9 @@ class NetworkTest {
             $this->defaultsSet[] = $key;
           }
         }
+        if (isset($this->options['throughput_size']) && $this->options['throughput_size'] == 0) $this->options['throughput_time'] = TRUE;
+        if (!isset($this->options['throughput_samples'])) $this->options['throughput_samples'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 10 : 5;
+        if (!isset($this->options['throughput_timeout'])) $this->options['throughput_timeout'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 5 : 180;
         
         // expand geo_regions
         if (isset($this->options['geo_regions'])) {
@@ -336,7 +412,6 @@ class NetworkTest {
             print_msg(sprintf('Successfully retrieved %d runtime parameters from the URL %s', count($params), $this->options['params_url']), $this->verbose, __FILE__, __LINE__);
             foreach($params as $key => $val) {
               if (!isset($this->options[$key]) || in_array($key, $this->defaultsSet)) {
-                // TODO: set tests based on probe_type and --test
                 print_msg(sprintf('Added runtime parameter %s=%s from --params_url', $key, $val), $this->verbose, __FILE__, __LINE__);
                 $this->options[$key] = $val;
               }
@@ -362,7 +437,7 @@ class NetworkTest {
             $endpoints = array();
             foreach(explode(',', $endpoint) as $e1) {
               foreach(explode(' ', $e1) as $e2) {
-                $e2 = strtolower(trim($e2));
+                $e2 = trim($e2);
                 if ($e2 && !in_array($e2, $endpoints)) $endpoints[] = $e2;
                 if (count($endpoints) == 2) break;
               }
@@ -404,7 +479,7 @@ class NetworkTest {
             }
           }
           if (!isset($this->options['meta_location']) && ($hostname = trim(shell_exec('hostname'))) && ($geoip = geoiplookup($hostname, $this->verbose))) {
-            $this->options['meta_location'][$i] = sprintf('%s%s', isset($geoip['state']) ? $geoip['state'] . ', ' : '', $geoip['country']);
+            $this->options['meta_location'] = sprintf('%s%s', isset($geoip['state']) ? $geoip['state'] . ', ' : '', $geoip['country']);
           }
         }
         
@@ -431,7 +506,7 @@ class NetworkTest {
           $pieces = explode(',', $this->options['meta_location']);
           $this->options['meta_location_country'] = strtoupper(trim($pieces[count($pieces) - 1]));
           $this->options['meta_location_state'] = count($pieces) > 1 ? trim($pieces[0]) : NULL;
-          if ($geoRegion = getGeoRegion($this->options['meta_location_country'], isset($this->options['meta_location_state']) ? $this->options['meta_location_state'] : NULL)) $this->options['meta_geo_region'] = $geoRegion;
+          if ($geoRegion = $this->getGeoRegion($this->options['meta_location_country'], isset($this->options['meta_location_state']) ? $this->options['meta_location_state'] : NULL)) $this->options['meta_geo_region'] = $geoRegion;
         }
       }
     }
@@ -461,12 +536,14 @@ class NetworkTest {
     print_msg(sprintf('Initiating testing for %d test endpoints', count($this->options['test_endpoint'])), $this->verbose, __FILE__, __LINE__);
     
     // randomize testing order
+    $keys = array_keys($this->options['test_endpoint']);
     if (isset($this->options['randomize']) && $this->options['randomize']) {
       print_msg(sprintf('Randomizing test order'), $this->verbose, __FILE__, __LINE__);
-      shuffle($this->options['test_endpoint']);
+      shuffle($keys);
     }
     
-    foreach($this->options['test_endpoint'] as $i => $endpoints) {
+    foreach($keys as $testNum => $i) {
+      $endpoints = $this->options['test_endpoint'][$i];
       // max test time
       if (isset($this->options['max_runtime']) && ($testStarted + $this->options['max_runtime']) <= time()) {
         print_msg(sprintf('--max_time %d seconds reached - aborting testing', $this->options['max_runtime']), $this->verbose, __FILE__, __LINE__);
@@ -483,20 +560,57 @@ class NetworkTest {
         print_msg(sprintf('--abort_threshold %d reached - aborting testing', $this->options['abort_threshold']), $this->verbose, __FILE__, __LINE__, TRUE);
         break;
       }
+      // same constraints did not match
       else if (!$this->validateSameConstraints($i)) {
         print_msg(sprintf('Skipping testing for endpoint %s because one or more --same* constraints did not match', $endpoints[0]), $this->verbose, __FILE__, __LINE__);
         continue;
       }
       
-      $tests = isset($this->options['test'][$i]) ? $this->options['test'][$i] : $this->options['test'][0];
+      $tests = array_key_exists($i, $this->options['test']) ? $this->options['test'][$i] : $this->options['test'][0];
+      // replace throughput with downlink + uplink
+      if (in_array('throughput', $tests)) {
+        if (!in_array('downlink', $tests)) $tests[] = 'downlink';
+        if (!in_array('uplink', $tests)) $tests[] = 'uplink';
+        unset($tests[array_search('throughput', $tests)]);
+      }
+      $serviceId = isset($this->options['test_service_id']) ? (array_key_exists($i, $this->options['test_service_id']) ? $this->options['test_service_id'][$i] : $this->options['test_service_id'][0]) : NULL;
+      $providerId = isset($this->options['test_provider_id']) ? (array_key_exists($i, $this->options['test_provider_id']) ? $this->options['test_provider_id'][$i] : $this->options['test_provider_id'][0]) : NULL;
+      $serviceType = isset($this->options['test_service_type']) ? (array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : $this->options['test_service_type'][0]) : NULL;
+      if ($serviceId && !$serviceType && count($pieces = explode(':', $serviceId)) == 2 && in_array($pieces[1], array('servers', 'vps', 'compute', 'storage', 'cdn', 'dns'))) $serviceType = $pieces[1] == 'servers' || $pieces[1] == 'vps' ? 'compute' : $pieces[1];
+      if ($serviceType) {
+        $supportedTests = array();
+        switch($serviceType) {
+          case 'compute':
+          case 'paas':
+            $supportedTests[] = 'uplink';
+            $supportedTests[] = 'downlink';
+            $supportedTests[] = 'latency';
+            break;
+          case 'storage':
+          case 'cdn':
+            $supportedTests[] = 'downlink';
+            $supportedTests[] = 'latency';
+            break;
+          case 'dns':
+            $supportedTests[] = 'dns';
+            break;
+        }
+        // no tests to run
+        $btests = array();
+        foreach($tests as $test) $btests[] = $test;
+        $tests = array_intersect($tests, $supportedTests);
+        if (!count($tests)) {
+          print_msg(sprintf('Skipping testing for endpoint %s because supported tests [%s] are not included in --test [%s]. providerId: %s; serviceId: %s; serviceType: %s', $endpoints[0], implode(', ', $supportedTests), implode(', ', $btests), $providerId, $serviceId, $serviceType), $this->verbose, __FILE__, __LINE__);
+          continue;
+        } 
+      }
+      
       if (isset($this->options['randomize']) && $this->options['randomize']) shuffle($tests);
-      print_msg(sprintf('Starting testing of endpoint %s - %d tests have been set', $endpoints[0], count($tests)), $this->verbose, __FILE__, __LINE__);
-      foreach($tests as $x => $test) {
+      print_msg(sprintf('Starting [%s] testing of endpoint %s [%d of %d]. providerId: %s; serviceId: %s; serviceType: %s', implode(', ', $tests), $endpoints[0], $testNum + 1, count($keys), $providerId, $serviceId, $serviceType), $this->verbose, __FILE__, __LINE__);
+      foreach($tests as $test) {
         // check for endpoints/service/providers to skip latency testing for
         if ($test == 'latency' && isset($this->options['latency_skip'])) {
           $hostname = get_hostname($endpoints[0]);
-          $serviceId = isset($this->options['test_service_id']) ? (isset($this->options['test_service_id'][$i]) ? $this->options['test_service_id'][$i] : $this->options['test_service_id'][0]) : NULL;
-          $providerId = isset($this->options['test_provider_id']) ? (isset($this->options['test_provider_id'][$i]) ? $this->options['test_provider_id'][$i] : $this->options['test_provider_id'][0]) : NULL;
           if (in_array($hostname, $this->options['latency_skip']) || in_array($serviceId, $this->options['latency_skip']) || in_array($providerId, $this->options['latency_skip'])) {
             print_msg(sprintf('Skipping latency test for endpoint %s; service %s; provider %s; due to --latency_skip constraint', $endpoints[0], $serviceId, $providerId), $this->verbose, __FILE__, __LINE__);
             continue;
@@ -504,7 +618,7 @@ class NetworkTest {
         }
         
         // spacing
-        if ($i > 0 && isset($this->options['spacing'])) {
+        if ($testNum > 0 && isset($this->options['spacing'])) {
           usleep($this->options['spacing']*1000);
           print_msg(sprintf('Applied test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
         }
@@ -517,7 +631,7 @@ class NetworkTest {
         $testStart = NULL;
         $testStop = NULL;
         foreach(array_reverse($endpoints) as $n => $endpoint) {
-          if (count($endpoints) > 1 && $n == 0 && !$this->usePrivateNetwork($i)) {
+          if ($test != 'dns' && count($endpoints) > 1 && $n == 0 && !$this->usePrivateNetwork($i)) {
             print_msg(sprintf('Skipping private network endpoint %s because services are not related', $endpoint), $this->verbose, __FILE__, __LINE__);
             continue;
           }
@@ -526,24 +640,23 @@ class NetworkTest {
             case 'latency':
               $results['latency'] = $this->testLatency($endpoint);
               break;
-            case 'throughput':
             case 'downlink':
-              $results['downlink'] = $this->testDownlink($endpoint);
-              if ($test == 'downlink') break;
+              $results['downlink'] = $this->testThroughput($endpoint, $i);
+              break;
             case 'uplink':
-              $results['uplink'] = $this->testUplink($endpoint);
+              $results['uplink'] = $this->testThroughput($endpoint, $i, TRUE);
               break;
             case 'dns':
-              $results['dns'] = $this->testDns($endpoint);
+              $results['dns'] = $this->testDns($endpoints);
               break;
           }
           $testStop = date('Y-m-d H:i:s');
           // check if test completed
-          $done = FALSE;
+          $done = $test == 'dns' ? TRUE : FALSE;
           foreach(array_keys($results) as $key) {
             if (is_array($results[$key])) $done = TRUE;
           }
-          if ($done) {
+          if ($done && $test != 'dns') {
             if (count($endpoints) > 1 && $n == 0) $privateEndpoint = TRUE;
             break;
           }
@@ -551,7 +664,7 @@ class NetworkTest {
         
         foreach($results as $test => $metrics) {
           $success = TRUE;
-          $row = array('test' => $test, 'test_endpoint' => $endpoint, 'test_started' => $testStart, 'test_stopped' => $testStop);
+          $row = array('test' => $test, 'test_endpoint' => $endpoint, 'test_ip' => gethostbyname(get_hostname(str_replace('*', rand(), $endpoint))), 'test_started' => $testStart, 'test_stopped' => $testStop);
           if ($country = isset($this->options['test_location_country'][$i]) ? $this->options['test_location_country'][$i] : NULL) {
             $state = isset($this->options['test_location_state'][$i]) ? $this->options['test_location_state'][$i] : NULL;
             if ($geoRegion = $this->getGeoRegion($country, $state)) $row['test_geo_region'] = $geoRegion;
@@ -559,38 +672,54 @@ class NetworkTest {
           
           // add additional test_* result attributes
           foreach(array('test_instance_id', 'test_location', 'test_location_country', 'test_location_state', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type') as $param) {
-            if (isset($this->options[$param]) && (isset($this->options[$param][$i]) || isset($this->options[$param][0]))) $row[$param] = isset($this->options[$param][$i]) ? $this->options[$param][$i] : $this->options[$param][0];
+            if (isset($this->options[$param]) && (array_key_exists($i, $this->options[$param]) || isset($this->options[$param][0]))) $row[$param] = array_key_exists($i, $this->options[$param]) ? $this->options[$param][$i] : $this->options[$param][0];
           }
           // private endpoint?
           if ($privateEndpoint) {
             $row['test_private_endpoint'] = TRUE;
-            if (isset($this->options['test_private_network_type'])) $row['test_private_network_type'] = isset($this->options['test_private_network_type'][$i]) ? $this->options['test_private_network_type'][$i] : $this->options['test_private_network_type'][0];
+            if (isset($this->options['test_private_network_type'])) $row['test_private_network_type'] = array_key_exists($i, $this->options['test_private_network_type']) ? $this->options['test_private_network_type'][$i] : $this->options['test_private_network_type'][0];
           }
           $row['timeout'] = $this->options[sprintf('%s_timeout', $test == 'dns' || $test == 'latency' ? $test : 'throughput')];
           
           if (isset($metrics) && is_array($metrics)) {
             $testsCompleted++;
-            print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
             if (isset($metrics['metrics'])) $row = array_merge($row, $metrics);
             else $row['metrics'] = $metrics;
-            // determine status (if one or more non-numeric values in metrics, 
-            // status is partial)
-            $status = 'success';
+            // determine status from tests_failed and tests_success
+            $status = 'fail';
             foreach($row['metrics'] as $n => $metric) {
-              if (!is_numeric($metric)) {
-                $status = 'partial';
-                unset($row['metrics'][$n]);
-              }
+              if (is_numeric($metric)) $status = 'success';
             }
+            if (isset($row['tests_failed']) && $row['tests_failed'] > 0) $status = isset($row['tests_success']) && !$row['tests_success'] ? 'fail' : 'partial';
+            else if (isset($row['tests_success']) && $row['tests_success'] > 0) $status = 'success';
             
             // calculate metric statistical values
-            $row['metric'] = get_mean($row['metrics']);
-            $row['metric_10'] = get_percentile($row['metrics'], 10, $test == 'latency' || $test == 'dns' ? TRUE : FALSE);
-            $row['metric_90'] = get_percentile($row['metrics'], 90, $test == 'latency' || $test == 'dns' ? TRUE : FALSE);
-            $row['metric_median'] = get_mean($row['metrics']);
+            $lowerBetter = $test == 'latency' || $test == 'dns' || isset($this->options['throughput_time']);
+            $lowerBetter ? rsort($row['metrics']) : sort($row['metrics']);
+            $discardSlowest = isset($this->options['discard_slowest']) ? $this->options['discard_slowest'] : 0;
+            $discardFastest = isset($this->options['discard_fastest']) ? $this->options['discard_fastest'] : 0;
+            if ($discardSlowest || $discardFastest) {
+              print_msg(sprintf('Trimming %s of slowest and %s of fastest metrics [%s]; Lower better: %s', $discardSlowest . '%', $discardFastest . '%', implode(', ', $row['metrics']), $lowerBetter), $this->verbose, __FILE__, __LINE__);
+              $row['metrics'] = trim_points($row['metrics'], $discardSlowest, $discardFastest);
+              print_msg(sprintf('Trimmed metrics [%s]', implode(', ', $row['metrics'])), $this->verbose, __FILE__, __LINE__);
+            }
+            $row['metric'] = get_median($row['metrics']);
+            $row['metric_10'] = get_percentile($row['metrics'], 10, $lowerBetter);
+            $row['metric_90'] = get_percentile($row['metrics'], 90, $lowerBetter);
+            $row['metric_fastest'] = $row['metrics'][count($row['metrics']) - 1];
+            $row['metric_mean'] = get_mean($row['metrics']);
+            $row['metric_slowest'] = $row['metrics'][0];
+            $row['metric_max'] = $lowerBetter ? $row['metric_slowest'] : $row['metric_fastest'];
+            $row['metric_min'] = $lowerBetter ? $row['metric_fastest'] : $row['metric_slowest'];
             $row['metric_stdev'] = get_std_dev($row['metrics']);
+            $row['metric_rstdev'] = round(($row['metric_stdev']/$row['metric'])*100, 4);
+            $row['metric_sum'] = array_sum($row['metrics']);
+            $row['metric_sum_squares'] = get_sum_squares($row['metrics']);
             $row['samples'] = count($row['metrics']);
             $row['status'] = $status;
+            print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('status: %s; samples: %d; median: %s; mean: %s; 10th: %s; 90th: %s; fastest: %s; slowest: %s; min: %s; max: %s; sum/squares: %s/%s; stdev: %s', $row['status'], $row['samples'], $row['metric'], $row['metric_mean'], $row['metric_10'], $row['metric_90'], $row['metric_fastest'], $row['metric_slowest'], $row['metric_min'], $row['metric_max'], $row['metric_sum'], $row['metric_sum_squares'], $row['metric_stdev']), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('metrics: [%s]', implode(', ', $row['metrics'])), $this->verbose, __FILE__, __LINE__);
             unset($row['metrics']);
             $this->results[] = $row;
           }
@@ -600,10 +729,11 @@ class NetworkTest {
             if (!isset($this->options['suppress_failed']) || !$this->options['suppress_failed']) {
               if (isset($this->options['traceroute'])) {
                 $hostname = get_hostname($endpoint);
-                $file = sprintf('%s/traceroute-%s-%s.log', $this->options['output'], $hostname, $test);
-                if (!file_exists($file)) {
+                $file = sprintf('%s/traceroute.log', $this->options['output']);
+                if (!isset($this->traceroutes[$hostname])) {
+                  $this->traceroutes[$hostname] = TRUE;
                   print_msg(sprintf('Initiating traceroute to host %s - results to be written to %s', $hostname, $file), $this->verbose, __FILE__, __LINE__);
-                  exec(sprintf('traceroute %s > %s 2>/dev/null', $hostname, $file));
+                  exec(sprintf('traceroute %s >> %s 2>/dev/null', $hostname, $file));
                 }
               }
               $row['status'] = 'failed';
@@ -628,35 +758,90 @@ class NetworkTest {
    * metrics, or a hash with a 'metrics' key (and may include other meta 
    * attributes to be included in results for this test). returns NULL if the
    * test failed
-   * @param string $endpoint
+   * @param string $endpoints test endpoint [0] + optional DNS servers [1-N]
    * @return array
    */
-  private function testDns($endpoint) {
-    // params: dns_one_server, dns_recursive, dns_samples, dns_tcp, dns_timeout
-    // results: dns_custom, dns_recursive, dns_servers
+  private function testDns($endpoints) {
     $metrics = NULL;
-    if ($endpoint = get_hostname($endpoint)) {
-      // TODO
+    if ($endpoint = get_hostname($endpoints[0])) {
+      $retries = $this->options['dns_retry'];
+      $samples = $this->options['dns_samples'];
+      $timeout = $this->options['dns_timeout'];
+      // determine name servers to use
+      if ($nameservers = count($endpoints) > 1 ? array_slice($endpoints, 1) : array()) print_msg(sprintf('Initiating DNS for hostname %s using explicit name servers: %s', $endpoint, implode(', ', $nameservers)), $this->verbose, __FILE__, __LINE__);
+      else {
+        // recursive DNS => use /etc/resolv.conf
+        if (isset($this->options['dns_recursive'])) {
+          foreach(file('/etc/resolv.conf') as $line) {
+            if (preg_match('/^nameserver\s+(.*)$/', trim($line), $m)) $nameservers[] = $m[1];
+          }
+          if ($nameservers) print_msg(sprintf('Initiating DNS for hostname %s using recursive name servers (from /etc/resolv.conf): %s', $endpoint, implode(', ', $nameservers)), $this->verbose, __FILE__, __LINE__);
+          else print_msg(sprintf('Unable to determine recursive name servers for hostname %s from /etc/resolv.conf', $endpoint), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
+        // authoritative name servers (using dig NS)
+        else {
+          $countries =& $this->getCountries();
+          $pieces = explode('.', str_replace('.*', '', $endpoint));
+          $last = count($pieces) - 1;
+          $domain = isset($countries[strtoupper($pieces[$last])]) && count($pieces) > 3 && $pieces[$last - 2] != 'test' ? sprintf('%s.%s.%s', $pieces[$last - 2], $pieces[$last - 1], $pieces[$last]) : sprintf('%s.%s', $pieces[$last - 1], $pieces[$last]);
+          if ($buffer = trim(shell_exec(sprintf('dig +short NS %s 2>/dev/null', $domain)))) {
+            foreach(explode("\n", $buffer) as $nameserver) {
+              if (substr($nameserver, -1) == '.') $nameserver = substr($nameserver, 0, -1);
+              if (!in_array($nameserver, $nameservers)) $nameservers[] = $nameserver;
+            }
+          }
+          if ($nameservers) print_msg(sprintf('Initiating DNS for hostname %s using authoritative name servers: %s', $endpoint, implode(', ', $nameservers)), $this->verbose, __FILE__, __LINE__);
+          else print_msg(sprintf('Unable to determine authoritative name servers for hostname %s', $endpoint), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
+      }
+      
+      if ($nameservers) {
+        $tests_failed = 0;
+        $tests_success = 0;
+        $metrics = array();
+        shuffle($nameservers);
+        while(count($metrics) < $samples) {
+          $oneServerIndex = NULL;
+          foreach($nameservers as $i => $nameserver) {
+            // only test one (fixed) name server
+            if (isset($this->options['dns_one_server']) && isset($oneServerIndex) && $oneServerIndex != $i) continue;
+            
+            $metric = NULL;
+            $lookup = str_replace('*', rand(), $endpoint);
+            $cmd = sprintf('dig +short +%stcp +time=%d%s +%srecurse @%s %s', isset($this->options['dns_tcp']) ? '' : 'no', $timeout, !isset($this->options['dns_tcp']) && $retries != 2 ? ' +retry=' . $retries : '', isset($this->options['dns_recursive']) ? '' : 'no', $nameserver, $lookup);
+            print_msg(sprintf('Performing DNS query for hostname %s using name server %s [%s]', $lookup, $nameserver, $cmd), $this->verbose, __FILE__, __LINE__);
+            $start = microtime(TRUE);
+            if (preg_match('/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/', $buffer = trim(exec($cmd . ' 2>/dev/null')), $m)) {
+              $metric = round((microtime(TRUE) - $start)*1000, 3);
+              print_msg(sprintf('Successfully performed DNS query for hostname %s [%s] using name server %s in %s ms', $lookup, $m[1], $nameserver, $metric), $this->verbose, __FILE__, __LINE__);
+            }
+            else print_msg(sprintf('Unable to perform DNS query for hostname %s using name server %s. Output: %s', $lookup, $nameserver, $buffer), $this->verbose, __FILE__, __LINE__, TRUE);
+            
+            if ($metric) {
+              $tests_success++;
+              $oneServerIndex = $i;
+              $metrics[] = $metric;
+              if (count($metrics) >= $samples) break;
+              // spacing
+              if (count($metrics) > 1 && isset($this->options['spacing'])) {
+                usleep($this->options['spacing']*1000);
+                print_msg(sprintf('Applied DNS test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+              }
+            }
+            else $tests_failed++;
+          }
+          if (!count($metrics)) {
+            print_msg(sprintf('Unable to perform DNS query for hostname %s and nameservers: %s', $lookup, implode(', ', $nameservers)), $this->verbose, __FILE__, __LINE__, TRUE);
+            break;
+          }
+        }
+        if (count($metrics)) {
+          $metrics = array('dns_servers' => isset($this->options['dns_one_server']) ? 1 : count($nameservers), 'metrics' => $metrics, 'tests_failed' => $tests_failed, 'tests_success' => $tests_success);
+          print_msg(sprintf('Successfully performed %d DNS queries using %d name servers for endpoint %s. Metrics: [%s]', count($metrics['metrics']), $metrics['dns_servers'], $endpoint, implode(', ', $metrics['metrics'])), $this->verbose, __FILE__, __LINE__);
+        }
+        else print_msg(sprintf('Unable to perform any DNS queries for endpoint %s', $endpoint), $this->verbose, __FILE__, __LINE__, TRUE);
+      }
     }
-    return $metrics;
-  }
-  
-  /**
-   * performs a download test for $endpoint. returns either an array of numeric 
-   * metrics, or a hash with a 'metrics' key (and may include other meta 
-   * attributes to be included in results for this test). returns NULL if the
-   * test failed
-   * @param string $endpoint
-   * @return array
-   */
-  private function testDownlink($endpoint) {
-    // params: throughput_https, throughput_same_continent, throughput_same_country, 
-    // throughput_same_geo_region, throughput_same_provider, throughput_same_region, 
-    // throughput_same_service, throughput_same_state, throughput_samples, throughput_size,
-    // throughput_threads, throughput_timeout, throughput_uri
-    // results: throughput_https, throughput_size, throughput_threads
-    $metrics = NULL;
-    // TODO
     return $metrics;
   }
   
@@ -665,7 +850,7 @@ class NetworkTest {
    * metrics, or a hash with a 'metrics' key (and may include other meta 
    * attributes to be included in results for this test). returns NULL if the
    * test failed
-   * @param string $endpoint
+   * @param string $endpoint test endpoint
    * @return array
    */
   private function testLatency($endpoint) {
@@ -680,9 +865,11 @@ class NetworkTest {
 				$ecode = $pieces[count($pieces) - 1];
 				// ping successful
 				if ($ecode == 0 && preg_match_all('/time\s*=\s*([0-9\.]+)\s+/msU', $buffer, $m)) {
-				  $metrics = array();
-					foreach($m[1] as $metric) $metrics[] = $metric*1;
-          print_msg(sprintf('ping exited successfully with %d metrics: %s', count($metrics), implode(', ', $metrics)), $this->verbose, __FILE__, __LINE__);
+				  $metrics = array('metrics' => array());
+					foreach($m[1] as $metric) $metrics['metrics'][] = $metric*1;
+					$metrics['tests_failed'] = $samples - count($metrics['metrics']);
+					$metrics['tests_success'] = count($metrics['metrics']);
+          print_msg(sprintf('ping exited successfully with %d successful, %d failed. Metrics: %s', $metrics['tests_success'], $metrics['tests_failed'], implode(', ', $metrics['metrics'])), $this->verbose, __FILE__, __LINE__);
 			  }
 				// ping exited normally, but no metrics produced
 				else if ($ecode == 0) print_msg(sprintf('ping exited successfully, but did not produce valid output: %s', $buffer), $this->verbose, __FILE__, __LINE__, TRUE);
@@ -696,22 +883,177 @@ class NetworkTest {
   }
   
   /**
-   * performs a upload test for $endpoint. returns either an array of numeric 
-   * metrics, or a hash with a 'metrics' key (and may include other meta 
-   * attributes to be included in results for this test). returns NULL if the
-   * test failed
-   * @param string $endpoint
+   * performs a throughput test for $endpoint. returns either an array of 
+   * numeric metrics, or a hash with a 'metrics' key (and may include other 
+   * meta attributes to be included in results for this test). returns NULL if 
+   * the test failed
+   * @param string $endpoint test endpoint
+   * @param int $idx the endpoint test index
+   * @param boolean $uplink if TRUE, uplink test will be performed, otherwise
+   * downlink
    * @return array
    */
-  private function testUplink($endpoint) {
-    // params: throughput_https, throughput_same_continent, throughput_same_country, 
+  private function testThroughput($endpoint, $idx, $uplink=FALSE) {
+    // params: throughput_same_continent, throughput_same_country, 
     // throughput_same_geo_region, throughput_same_provider, throughput_same_region, 
-    // throughput_same_service, throughput_same_state, throughput_samples, throughput_size,
-    // throughput_threads, throughput_timeout, throughput_uri
-    // results: throughput_https, throughput_size, throughput_threads
+    // throughput_same_service, throughput_same_state
     $metrics = NULL;
-    // TODO
+    $type = $uplink ? 'uplink' : 'downlink';
+    
+    // determine base endpoint URLs
+    $endpoints = array();
+    if (preg_match('/^http/', $endpoint)) $endpoints[] = $endpoint;
+    else {
+      foreach(isset($this->options['throughput_https']) ? array('https', 'http') : array('http') as $proto) $endpoints[] = sprintf('%s://%s', $proto, $endpoint);
+    }
+    
+    foreach(array_keys($endpoints) as $i) {
+      // add base URI suffix
+      if (!preg_match('/^https?:\/\/.*\//', $endpoints[$i])) $endpoints[$i] = sprintf('%s%s%s', $endpoints[$i], substr($this->options['throughput_uri'], 0, 1) != '/' ? '/' : '', $this->options['throughput_uri']);
+      // remove trailing /
+      else if (substr($endpoints[$i], -1, 1) == '/') $endpoints[$i] = substr($endpoints[$i], 0, strlen($endpoints[$i]) - 1);
+    }
+    
+    $samples = $this->options['throughput_samples'];
+    $ping = FALSE;
+    if (!isset($this->options['throughput_small_file'])) {
+      $sizeMb = $this->options['throughput_size'];
+
+      // adjust size for same constraints
+      if ($sizeMb > 0) {
+        foreach(array('continent', 'country', 'geo_region', 'provider', 'region', 'service', 'state') as $param) {
+          $key = sprintf('throughput_same_%s', $param);
+          if (isset($this->options[$key]) && $this->options[$key] > $sizeMb) {
+            print_msg(sprintf('Evaluating --%s parameter for size %d MB [current size %d MB]', $key, $this->options[$key], $sizeMb), $this->verbose, __FILE__, __LINE__);
+            if ($this->validateSameConstraints($idx, $param)) {
+              $sizeMb = $this->options[$key];
+              print_msg(sprintf('--%s parameter matches for endpoint %s. Test size increased to %d MB', $key, $endpoint, $sizeMb), $this->verbose, __FILE__, __LINE__);
+            }
+            else print_msg(sprintf('Skipping parameter --%s because it does not match endpoint %s', $key, $endpoint), $this->verbose, __FILE__, __LINE__);
+          }
+          else if (isset($this->options[$key])) print_msg(sprintf('Skipping --%s parameter for size %d MB because it is less than the current size %d MB', $key, $this->options[$key], $sizeMb), $this->verbose, __FILE__, __LINE__);
+        }
+        print_msg(sprintf('Using test size %d MB for endpoint %s', $sizeMb, $endpoint), $this->verbose, __FILE__, __LINE__);
+      }
+      else $ping = TRUE;
+
+      $size = $ping ? 8 : ($sizeMb*1024)*1024;
+    }
+    $threads = $this->options['throughput_threads'];
+    $timeout = $this->options['throughput_timeout'];
+    $serviceType = isset($this->options['test_service_type']) && array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
+    $expectedBytes = 0;
+    foreach($endpoints as $endpoint) {
+      print_msg(sprintf('Attempting %s test using base URI %s; samples: %d; size: %s MB; threads: %d; timeout: %d', $type, $endpoint, $samples, isset($this->options['throughput_small_file']) ? 'rand small file' : $sizeMb, $threads, $timeout), $this->verbose, __FILE__, __LINE__);
+      $requests = array();
+      for($i=0; $i<$threads; $i++) {
+        $request = array('method' => $uplink ? 'POST' : 'GET');
+        if ($uplink) $request['url'] = $url = sprintf('%s/up.html', $endpoint);
+        if (!isset($this->options['throughput_small_file'])) {
+          if ($uplink) {
+            $request['body'] = $size;
+            $expectedBytes += $size;
+          }
+          else {
+            $file = $this->getDownlinkFile($size, $serviceType);
+            $request['url'] = $url = sprintf('%s/%s', $endpoint, $file['name']);
+            $expectedBytes += $file['size'];   
+          }
+        }
+        $requests[] = $request;
+        print_msg(sprintf('Added curl request [%s] [%s] to test', implode(', ', array_keys($request)), implode(', ', $request)), $this->verbose, __FILE__, __LINE__);
+      }
+      for($i=0; $i<$samples; $i++) {
+        // choose random small file URLs/upload sizes
+        if (isset($this->options['throughput_small_file'])) {
+          $expectedBytes = 0;
+          foreach(array_keys($requests) as $n) {
+            $size = rand(1, self::SMALL_FILE_LIMIT);
+            if ($uplink) {
+              $requests[$n]['body'] = $size;
+              $expectedBytes += $size;
+            }
+            else {
+              $file = $this->getDownlinkFile($size, $serviceType);
+              $requests[$n]['url'] = $url = sprintf('%s/%s', $endpoint, $file['name']);
+              $expectedBytes += $file['size'];
+            }
+            print_msg(sprintf('Added small file request for size %d and URL %s', $size, $requests[$n]['url']), $this->verbose, __FILE__, __LINE__);
+          }
+        }
+        
+        // spacing
+        if ($metrics && $i > 1 && isset($this->options['spacing'])) {
+          usleep($this->options['spacing']*1000);
+          print_msg(sprintf('Applied throughput test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+        }
+        
+        if ($response = ch_curl_mt($requests, $timeout, $this->options['output'], FALSE, preg_match('/^https/', $url) ? TRUE : FALSE)) {
+          if (isset($response['highest_status']) && isset($response['results']) && count($response['results'])) {
+            if ($response['highest_status'] < 300) {
+              print_msg(sprintf('curl request(s) for samples %d of %d completed successfully - highest response status is %d and %d results exist', $i+1, $samples, $response['highest_status'], count($response['results'])), $this->verbose, __FILE__, __LINE__);
+              $speeds = array();
+              $times = array();
+              $bytes = 0;
+              $numRequests = count($response['results']);
+              foreach($response['results'] as $result) {
+                print_msg(sprintf('Adding curl result [%s] [%s]', implode(', ', array_keys($result)), implode(', ', $result)), $this->verbose, __FILE__, __LINE__);
+                $speeds[] = $result['speed'];
+                $times[] = $result['time']*1000;
+                $bytes += $result['transfer'];
+              }
+              $mbTransferred = round(($bytes/1024)/1024, 6);
+              if (!$ping && $bytes < ($expectedBytes*0.85)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
+              else {
+                if (!isset($metrics)) {
+                  $metrics = array('metrics' => array(), 'throughput_size' => array(), 'throughput_threads' => $threads);
+                  if (preg_match('/^https/', $url)) $metrics['throughput_https'] = TRUE;
+                  if (isset($this->options['throughput_small_file'])) $metrics['throughput_small_file'] = TRUE;
+                  if (!$ping) $metrics['throughput_transfer'] = 0;
+                }
+                $avgMbs = round((((array_sum($speeds)/count($speeds))*8)/1024)/1024, 6);
+                $avgTime = round(array_sum($times)/count($times), 6);
+                $totalMbs = $avgMbs*$numRequests;
+                $metrics['metrics'][] = isset($this->options['throughput_time']) ? $avgTime : $totalMbs;
+                $metrics['throughput_size'][] = round((($bytes/1024)/1024)/$numRequests, 6);
+                if (!$ping) $metrics['throughput_transfer'] += $mbTransferred;
+                print_msg(sprintf('Test sample %d of %d for URL %s successful. Average rate is %s Mb/s. Average time is %s ms. Total rate is %s Mb/s. %s MB transfer on %d reqs', $i+1, $samples, $url, round($avgMbs, 4), $avgTime, round($totalMbs, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
+              }
+            }
+            else print_msg(sprintf('curl request(s) failed for URL %s because highest status %d is not 2XX', $url, $response['highest_status']), $this->verbose, __FILE__, __LINE__, TRUE);
+          }
+          else print_msg(sprintf('curl request(s) did not return highest_status or results for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
+        else print_msg(sprintf('curl request(s) failed for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        
+        if (!$metrics && (!$response || !isset($response['lowest_status']) || $response['lowest_status'] >= 300)) break;
+      }
+      if ($metrics) {
+        $metrics['throughput_size'] = $ping ? 0 : round(array_sum($metrics['throughput_size'])/count($metrics['throughput_size']), 6);
+        if (isset($this->options['throughput_time'])) $metrics['throughput_time'] = TRUE;
+				$metrics['tests_failed'] = $samples - count($metrics['metrics']);
+				$metrics['tests_success'] = count($metrics['metrics']);
+        print_msg(sprintf('%s testing completed with %d successful, %d failed using endpoint %s. Metrics are [%s] %s', $type, $metrics['tests_success'], $metrics['tests_failed'], $endpoint, implode(', ', $metrics['metrics']), isset($this->options['throughput_time']) ? 'ms' : 'Mb/s'), $this->verbose, __FILE__, __LINE__);
+        break;
+      }
+    }
+    
     return $metrics;
+  }
+  
+  /**
+   * returns TRUE if use of the private network address should be attempting 
+   * during testing (same provider, service and region)
+   * @param int $i the endpoint parameter index
+   * @return boolean
+   */
+  private function usePrivateNetwork($i) {
+    $usePrivate = FALSE;
+    $serviceId = isset($this->options['test_service_id']) ? (array_key_exists($i, $this->options['test_service_id']) ? $this->options['test_service_id'][$i] : $this->options['test_service_id'][0]) : NULL;
+    $region = isset($this->options['test_region']) ? (array_key_exists($i, $this->options['test_region']) ? $this->options['test_region'][$i] : $this->options['test_region'][0]) : NULL;
+    if ($serviceId && isset($this->options['meta_compute_service_id']) && $this->options['meta_compute_service_id'] == $serviceId && 
+       ((!$region && !isset($this->options['meta_region'])) || ($region && isset($this->options['meta_region']) && $region == $this->options['meta_region']))) $usePrivate = TRUE;
+    return $usePrivate;
   }
   
   /**
@@ -724,12 +1066,15 @@ class NetworkTest {
         
     $validate = array(
       'abort_threshold' => array('min' => 1),
+      'discard_fastest' => array('max' => 40, 'min' => 0),
+      'discard_slowest' => array('max' => 40, 'min' => 0),
+      'dns_retry' => array('max' => 10, 'min' => 1, 'required' => TRUE),
       'dns_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'dns_timeout' => array('max' => 60, 'min' => 1, 'required' => TRUE),
       'geo_regions' => array('option' => array_keys($this->getGeoRegions())),
       'latency_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'latency_timeout' => array('max' => 30, 'min' => 1, 'required' => TRUE),
-      'max_runtime' => array('min' => 30),
+      'max_runtime' => array('min' => 10),
       'max_tests' => array('min' => 1),
       'output' => array('write' => TRUE),
       'params_url' => array('url' => TRUE),
@@ -746,7 +1091,7 @@ class NetworkTest {
       'throughput_same_service' => array('max' => 1024, 'min' => 1),
       'throughput_same_state' => array('max' => 1024, 'min' => 1),
       'throughput_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
-      'throughput_size' => array('max' => 1024, 'min' => 1, 'required' => TRUE),
+      'throughput_size' => array('max' => 1024, 'min' => 0, 'required' => TRUE),
       'throughput_threads' => array('max' => 10, 'min' => 1, 'required' => TRUE),
       'throughput_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE)
     );
@@ -767,7 +1112,7 @@ class NetworkTest {
     
     // validate test_endpoint association parameters
     if (!isset($validated['test_endpoint']) && count($this->options['test_endpoint']) && !isset($this->options['service_lookup']) && !isset($this->options['geoiplookup'])) {
-      foreach(array('test', 'test_instance_id', 'test_location', 'test_private_network_type', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type') as $param) {
+      foreach(array('test_instance_id', 'test_location', 'test_private_network_type', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type') as $param) {
         if (!isset($validated[$param]) && isset($this->options[$param]) && count($this->options[$param]) != 1 && count($this->options[$param]) != count($this->options['test_endpoint'])) {
           $validated[$param] = sprintf('The --%s parameter can be specified once [same for all test_endpoint] or %d times [different for each test_endpoint]', $param, count($this->options[$param]));
         }
@@ -815,58 +1160,74 @@ class NetworkTest {
    * returns TRUE if the all --same* constraints match for $endpoint, FALSE 
    * otherwise
    * @param int $i the endpoint parameter index
+   * @param string $type optional explicit same constraint to match - otherwise 
+   * all those specified by the same_* parameters will be checked
    * @return boolean
    */
-  private function validateSameConstraints($i) {
-    $valid = TRUE;
+  private function validateSameConstraints($i, $type=NULL) {
     $endpoint = $this->options['test_endpoint'][$i][0];
-    $location = isset($this->options['test_location'][$i]) ? $this->options['test_location'][$i] : (isset($this->options['test_location'][0]) ? $this->options['test_location'][$i] : NULL);
-    $country = isset($this->options['test_location_country'][$i]) ? $this->options['test_location_country'][$i] : (isset($this->options['test_location_country'][0]) ? $this->options['test_location_country'][$i] : NULL);
-    $state = isset($this->options['test_location_state'][$i]) ? $this->options['test_location_state'][$i] : (isset($this->options['test_location_state'][0]) ? $this->options['test_location_state'][$i] : NULL);
-    $provider = isset($this->options['test_provider'][$i]) ? $this->options['test_provider'][$i] : (isset($this->options['test_provider'][0]) ? $this->options['test_provider'][$i] : NULL);
-    $providerId = isset($this->options['test_provider_id'][$i]) ? $this->options['test_provider_id'][$i] : (isset($this->options['test_provider_id'][0]) ? $this->options['test_provider_id'][$i] : NULL);
-    $service = isset($this->options['test_service'][$i]) ? $this->options['test_service'][$i] : (isset($this->options['test_service'][0]) ? $this->options['test_service'][$i] : NULL);
-    $serviceId = isset($this->options['test_service_id'][$i]) ? $this->options['test_service_id'][$i] : (isset($this->options['test_service_id'][0]) ? $this->options['test_service_id'][$i] : NULL);
-    $region = isset($this->options['test_region'][$i]) ? $this->options['test_region'][$i] : (isset($this->options['test_region'][0]) ? $this->options['test_region'][$i] : NULL);
+    $location = isset($this->options['test_location']) && array_key_exists($i, $this->options['test_location']) ? $this->options['test_location'][$i] : (isset($this->options['test_location'][0]) ? $this->options['test_location'][0] : NULL);
+    $country = isset($this->options['test_location_country']) && array_key_exists($i, $this->options['test_location_country']) ? $this->options['test_location_country'][$i] : (isset($this->options['test_location_country'][0]) ? $this->options['test_location_country'][0] : NULL);
+    $state = isset($this->options['test_location_state']) && array_key_exists($i, $this->options['test_location_state']) ? $this->options['test_location_state'][$i] : (isset($this->options['test_location_state'][0]) ? $this->options['test_location_state'][0] : NULL);
+    $provider = isset($this->options['test_provider']) && array_key_exists($i, $this->options['test_provider']) ? $this->options['test_provider'][$i] : (isset($this->options['test_provider'][0]) ? $this->options['test_provider'][0] : NULL);
+    $providerId = isset($this->options['test_provider_id']) && array_key_exists($i, $this->options['test_provider_id']) ? $this->options['test_provider_id'][$i] : (isset($this->options['test_provider_id'][0]) ? $this->options['test_provider_id'][0] : NULL);
+    $service = isset($this->options['test_service']) && array_key_exists($i, $this->options['test_service']) ? $this->options['test_service'][$i] : (isset($this->options['test_service'][0]) ? $this->options['test_service'][0] : NULL);
+    $serviceId = isset($this->options['test_service_id']) && array_key_exists($i, $this->options['test_service_id']) ? $this->options['test_service_id'][$i] : (isset($this->options['test_service_id'][0]) ? $this->options['test_service_id'][0] : NULL);
+    $serviceType = isset($this->options['test_service_type']) && array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
+    $region = isset($this->options['test_region']) && array_key_exists($i, $this->options['test_region']) ? $this->options['test_region'][$i] : (isset($this->options['test_region'][0]) ? $this->options['test_region'][0] : NULL);
     
+    $nodeCountry = isset($this->options['meta_location_country']) ? $this->options['meta_location_country'] : NULL;
+    $nodeState = isset($this->options['meta_location_state']) ? $this->options['meta_location_state'] : NULL;
+    $nodeRegion = isset($this->options['meta_region']) ? $this->options['meta_region'] : NULL;
+    $nodeLocation = isset($this->options['meta_location']) ? $this->options['meta_location'] : NULL;
     $nodeProvider = isset($this->options['meta_provider']) ? $this->options['meta_provider'] : NULL;
     $nodeProviderId = isset($this->options['meta_provider_id']) ? $this->options['meta_provider_id'] : NULL;
     $nodeService = isset($this->options['meta_service']) ? $this->options['meta_service'] : NULL;
     $nodeServiceId = isset($this->options['meta_service_id']) ? $this->options['meta_service_id'] : NULL;
     
-    // same_continent_only
-    if ($country && isset($this->options['same_continent_only']) && isset($this->options['meta_location_country']) && $this->getContinent($this->options['meta_location_country']) != getContinent($country)) {
-      print_msg(sprintf('Skipping test endpoint %s because its country %s is not in the same continent as the test node country %s', $endpoint, $country, $this->options['meta_location_country']), $this->verbose, __FILE__, __LINE__);
+    $checkContinent = $serviceType != 'cdn' && $serviceType != 'dns' && ((!$type && isset($this->options['same_continent_only'])) || $type == 'continent');
+    $checkCountry = $serviceType != 'cdn' && $serviceType != 'dns' && ((!$type && isset($this->options['same_country_only'])) || $type == 'country');
+    $checkState = (!$type && isset($this->options['same_state_only'])) || $type == 'state';
+    $checkGeoRegion = $serviceType != 'cdn' && $serviceType != 'dns' && ((!$type && isset($this->options['same_geo_region'])) || $type == 'geo_region');
+    $checkProvider = (!$type && isset($this->options['same_provider_only'])) || $type == 'provider';
+    $checkService = (!$type && isset($this->options['same_service_only'])) || $type == 'service';
+    $checkRegion = (!$type && isset($this->options['same_region_only'])) || $type == 'region';
+    
+    $valid = TRUE;
+    
+    // continent
+    if ($checkContinent && $this->getContinent($nodeCountry) != $this->getContinent($country)) {
+      print_msg(sprintf('Same continent constraint does not match for test endpoint %s because its country %s is not in the same continent as the test node country %s', $endpoint, $country, $nodeCountry), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_country_only
-    else if ($country && isset($this->options['meta_location_country']) && (isset($this->options['same_country_only']) || isset($this->options['same_state_only'])) && $country != $this->options['meta_location_country']) {
-      print_msg(sprintf('Skipping test endpoint %s because its country %s is not the same as the test node country %s', $endpoint, $country, $this->options['meta_location_country']), $this->verbose, __FILE__, __LINE__);
+    // country
+    else if (($checkCountry || $checkState) && $country != $nodeCountry) {
+      print_msg(sprintf('Same country constraint does not match for test endpoint %s because its country %s is not the same as the test node country %s', $endpoint, $country, $nodeCountry), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_state_only
-    else if ($state && isset($this->options['meta_location_state']) && isset($this->options['same_state_only']) && $state != $this->options['meta_location_state']) {
-      print_msg(sprintf('Skipping test endpoint %s because its state %s is not the same as the test node state %s', $endpoint, $state, $this->options['meta_location_state']), $this->verbose, __FILE__, __LINE__);
+    // state
+    else if ($checkState && $state != $nodeState) {
+      print_msg(sprintf('Same state constraint does not match for test endpoint %s because its state %s is not the same as the test node state %s', $endpoint, $state, $nodeState), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_geo_region
-    else if ($country && isset($this->options['meta_location_country']) && isset($this->options['same_geo_region']) && $this->getGeoRegion($country, $state) != $this->getGeoRegion($this->options['meta_location_country'], isset($this->options['meta_location_state']) ? $this->options['meta_location_state'] : NULL)) {
-      print_msg(sprintf('Skipping test endpoint %s because its location %s is not in the same geo region as the test node location %s', $endpoint, $location, $this->options['meta_location']), $this->verbose, __FILE__, __LINE__);
+    // geo_region
+    else if ($checkGeoRegion && $this->getGeoRegion($country, $state) != $this->getGeoRegion($nodeCountry, $nodeState)) {
+      print_msg(sprintf('Same geo_region constraint does not match for test endpoint %s because its location %s is not in the same geo region as the test node location %s', $endpoint, $location, $nodeLocation), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_provider_only
-    else if (($provider || $providerId) && ($nodeProvider || $nodeProviderId) && isset($this->options['same_provider_only']) && $provider != $nodeProvider && $providerId != $nodeProviderId) {
-      print_msg(sprintf('Skipping test endpoint %s because its provider %s [%s] is not in the same the test node provider %s [%s]', $endpoint, $provider, $providerId, $nodeProvider, $nodeProviderId), $this->verbose, __FILE__, __LINE__);
+    // provider
+    else if (($checkProvider || $checkService || $checkRegion) && $provider != $nodeProvider && $providerId != $nodeProviderId) {
+      print_msg(sprintf('Same provider constraint does not match for test endpoint %s because its provider %s [%s] is not in the same the test node provider %s [%s]', $endpoint, $provider, $providerId, $nodeProvider, $nodeProviderId), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_service_only
-    else if (($service || $serviceId) && ($nodeService || $nodeServiceId) && (isset($this->options['same_service_only']) || isset($this->options['same_region_only'])) && $service != $nodeService && $serviceId != $nodeServiceId) {
-      print_msg(sprintf('Skipping test endpoint %s because its service %s [%s] is not in the same the test node service %s [%s]', $endpoint, $service, $serviceId, $nodeService, $nodeServiceId), $this->verbose, __FILE__, __LINE__);
+    // service
+    else if (($checkService || $checkRegion) && $service != $nodeService && $serviceId != $nodeServiceId) {
+      print_msg(sprintf('Same service constraint does not match for test endpoint %s because its service %s [%s] is not in the same the test node service %s [%s]', $endpoint, $service, $serviceId, $nodeService, $nodeServiceId), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
-    // same_region_only
-    else if ($region && isset($this->options['meta_region']) && isset($this->options['same_region_only']) && $region != $this->options['meta_region']) {
-      print_msg(sprintf('Skipping test endpoint %s because its service region %s is not in the same the test node service region %s', $endpoint, $region, $this->options['meta_region']), $this->verbose, __FILE__, __LINE__);
+    // region
+    else if ($checkRegion && $region != $nodeRegion) {
+      print_msg(sprintf('Same service region constraint does not match for test endpoint %s because its service region %s is not in the same the test node service region %s', $endpoint, $region, $nodeRegion), $this->verbose, __FILE__, __LINE__);
       $valid = FALSE;
     }
     
