@@ -800,7 +800,7 @@ function validate_options($options, $validate) {
             else if ($val && !is_writable($val)) $err = sprintf('%s is not writable', $val);
             break;
           case 'url':
-            if ($val && filter_var($val, FILTER_VALIDATE_URL) === FALSE) $err = sprintf('%s is not a valid URL', $val);
+            if ($val && !preg_match('/\b(?:(?:https?|ftp):\/\/|www\.)[-a-z0-9+&@#\/%?=~_|!:,.;]*[-a-z0-9+&@#\/%=~_|]/i', $val)) $err = sprintf('%s is not a valid URL', $val);
             break;
         }
         if ($err) {
