@@ -128,6 +128,10 @@ are informational and used in conjunction with saving results (see save.sh)
 * meta_test_id              Optional unique identifier for a sequential of 
                             tests (e.g. aws-0914)
                             
+* min_runtime               May define an optional minimum runtime. If testing
+                            completes before this time is reached, the process
+                            will sleep for the remaining duration
+                            
 * output                    The output directory for writing test artifacts. If 
                             not specified, the current working directory will
                             be used
@@ -154,6 +158,13 @@ are informational and used in conjunction with saving results (see save.sh)
                             
 * randomize                 If set, the order of testing will be randomized 
                             (if multiple tests are defined)
+                            
+* sleep_before_start        an optional numeric value or range defining a 
+                            sleep period (seconds) to apply before starting 
+                            testing. If a single numeric value, that exact 
+                            period will be applied. If a range of values 
+                            (e.g. 30-90), then a random sleep period will be 
+                            applied within that range
                             
 * same_continent_only:      If set, only --test_endpoint hosts located in the 
                             same continent will be tested (others are skipped)

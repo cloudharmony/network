@@ -171,7 +171,10 @@ class BenchmarkDb {
       if (isset($options[$aparam]) && !is_array($options[$aparam])) {
         $p = array();
         foreach(explode(',', $options[$aparam]) as $v) {
-          foreach(explode(' ', trim($v)) as $v) $p[] = trim($v);
+          if (preg_match('/^"(.*)"$/', $v) || preg_match("/^'(.*)'\$/", $v)) $p[] = strip_quotes($v);
+          else {
+            foreach(explode(' ', trim($v)) as $v) $p[] = trim($v); 
+          }
         }
         $options[$aparam] = $p;
       }

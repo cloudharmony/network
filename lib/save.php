@@ -21,7 +21,7 @@
 require_once(dirname(__FILE__) . '/NetworkTest.php');
 require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
 $status = 1;
-$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'v' => 'verbose'), array('params_file'));
+$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'v' => 'verbose'), array('params_file'), 'save_');
 
 // save to multiple repositories (multiple --params_file parameters)
 if (isset($args['params_file']) && count($args['params_file']) > 1) {

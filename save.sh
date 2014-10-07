@@ -124,7 +124,10 @@ the others are not repeated, they will be applied to all submissions
                             minimum value
                             
 --db_librato_display_name   Name which will be used for the metric when viewing 
-                            the Metrics website
+                            the Metrics website. This parameter may also 
+                            contain column name tokens that will be replaced by 
+                            actual test values. The format for these is 
+                            {column_name}
                             
 --db_librato_display_units_long A string that identifies the unit of 
                             measurement e.g. Microseconds. Used in 

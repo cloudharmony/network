@@ -316,6 +316,7 @@ class NetworkTest {
           'meta_resource_id:',
           'meta_run_id:',
           'meta_test_id:',
+          'min_runtime:',
           'output:',
           'params_url:',
           'params_url_service_type:',
@@ -329,6 +330,7 @@ class NetworkTest {
           'same_service_only',
           'same_state_only',
           'service_lookup',
+          'sleep_before_start:',
           'spacing:',
           'suppress_failed',
           'test:',
@@ -533,6 +535,20 @@ class NetworkTest {
     $testsCompleted = 0;
     $testsFailed = 0;
     $testStarted = time();
+
+    // apply sleep period before starting testing
+    if (isset($this->options['sleep_before_start'])) {
+      $pieces = explode('-', $this->options['sleep_before_start']);
+      $min = trim($pieces[0]);
+      $max = isset($pieces[1]) ? trim($pieces[1]) : NULL;
+      if (is_numeric($min) && (!$max || (is_numeric($max) && $max > $min))) {
+        $sleep = $min && $max ? rand($min, $max) : $min;
+        print_msg(sprintf('Sleeping fore %d seconds before starting testing due to --sleep_before_start %s', $sleep, $this->options['sleep_before_start']), $this->verbose, __FILE__, __LINE__);
+        sleep($sleep);
+      }
+      else print_msg(sprintf('--sleep_before_start %s is not valid', $this->options['sleep_before_start']), $this->verbose, __FILE__, __LINE__, TRUE);
+    }
+    
     print_msg(sprintf('Initiating testing for %d test endpoints', count($this->options['test_endpoint'])), $this->verbose, __FILE__, __LINE__);
     
     // randomize testing order
@@ -750,7 +766,14 @@ class NetworkTest {
         else if (isset($this->options['abort_threshold']) && $testsFailed >= $this->options['abort_threshold']) break;
       }
     }
-    if ($success) $this->endTest();
+    if ($success) {
+      $this->endTest();
+      if (isset($this->options['min_runtime']) && ($testStarted + $this->options['min_runtime']) > time()) {
+        $sleep = ($testStarted + $this->options['min_runtime']) - time();
+        print_msg(sprintf('Testing complete and --min_runtime %d has not been acheived. Sleeping for %d seconds', $this->options['min_runtime'], $sleep), $this->verbose, __FILE__, __LINE__);
+        sleep($sleep);
+      }
+    }
     
     return $success;
   }
@@ -1078,6 +1101,7 @@ class NetworkTest {
       'latency_timeout' => array('max' => 30, 'min' => 1, 'required' => TRUE),
       'max_runtime' => array('min' => 10),
       'max_tests' => array('min' => 1),
+      'min_runtime' => array('min' => 10),
       'output' => array('write' => TRUE),
       'params_url' => array('url' => TRUE),
       'params_url_service_type' => array('option' => get_service_types()),
