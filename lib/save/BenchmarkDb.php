@@ -395,6 +395,10 @@ class BenchmarkDb {
         else if (isset($meta[$token])) $sub = $meta[$token];
         $str = str_replace($m[0][$i], $sub, $str);
       }
+      // remove leading and trailing dash (-) and underscore (_)
+      while($str && (substr($str, 0, 1) == '-' || substr($str, 0, 1) == '_')) $str = substr($str, 1);
+      while($str && (substr($str, -1) == '-' || substr($str, -1) == '_')) $str = substr($str, 0, -1);
+      $str = str_replace('--', '-', $str);
     }
     return $str;
   }
