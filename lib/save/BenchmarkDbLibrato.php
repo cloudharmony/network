@@ -167,7 +167,6 @@ class BenchmarkDbLibrato extends BenchmarkDb {
         fwrite($fp, json_encode($request));
         fclose($fp);
         $curl = ch_curl(self::LIBRATO_METRICS_API_URL, 'POST', array('Content-Type' => 'application/json'), $file, sprintf('%s:%s', $this->options['db_user'], $this->options['db_pswd']));
-        unlink($file);
         
         // API response
         if ($curl === NULL) print_msg(sprintf('Librato API POST request to %s failed - unknown error', self::LIBRATO_METRICS_API_URL), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
@@ -175,6 +174,7 @@ class BenchmarkDbLibrato extends BenchmarkDb {
         else {
           $imported = TRUE;
           print_msg(sprintf('Librato API POST request to %s successful. %d metrics were created', self::LIBRATO_METRICS_API_URL, $metrics), isset($this->options['verbose']), __FILE__, __LINE__);
+          unlink($file);
         }
       }
       else print_msg(sprintf('Unable to open file %s for writing', $file), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
