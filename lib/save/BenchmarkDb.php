@@ -400,8 +400,10 @@ class BenchmarkDb {
       $str = trim(str_replace('--', '-', $str));
       $str = trim(str_replace('[]', '', $str));
       $str = trim(str_replace('()', '', $str));
+      $str = trim($str);
       while($str && (substr($str, 0, 1) == '-' || substr($str, 0, 1) == '_')) $str = trim(substr($str, 1));
       while($str && (substr($str, -1) == '-' || substr($str, -1) == '_')) $str = trim(substr($str, 0, -1));
+      $str = trim($str);
     }
     return $str;
   }
