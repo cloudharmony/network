@@ -414,7 +414,7 @@ class NetworkTest {
             print_msg(sprintf('Successfully retrieved %d runtime parameters from the URL %s', count($params), $this->options['params_url']), $this->verbose, __FILE__, __LINE__);
             foreach($params as $key => $val) {
               if (!isset($this->options[$key]) || in_array($key, $this->defaultsSet)) {
-                print_msg(sprintf('Added runtime parameter %s=%s from --params_url', $key, $val), $this->verbose, __FILE__, __LINE__);
+                print_msg(sprintf('Added runtime parameter %s=%s from --params_url', $key, is_array($val) ? implode(',', $val) : $val), $this->verbose, __FILE__, __LINE__);
                 $this->options[$key] = $val;
               }
               else print_msg(sprintf('Skipping runtime parameter %s=%s from --params_url because it was set on the command line', $key, $val), $this->verbose, __FILE__, __LINE__);
