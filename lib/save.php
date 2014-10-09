@@ -23,6 +23,7 @@ require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
 $status = 1;
 $args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'recursive_order:', 'recursive_count:', 'v' => 'verbose'), array('params_file'), 'save_');
 $verbose = isset($args['verbose']);
+print_msg(sprintf('Initiating save with arguments [%s]', implode(', ', array_keys($args))), $verbose, __FILE__, __LINE__);
 
 // save to multiple repositories (multiple --params_file parameters)
 if (isset($args['params_file']) && count($args['params_file']) > 1) {
@@ -54,7 +55,7 @@ if ($db =& BenchmarkDb::getDb()) {
     
     $iteration = isset($args['iteration']) && preg_match('/([0-9]+)/', $args['iteration'], $m) ? $m[1]*1 : $i + 1;
     if ($results = $test->getResults()) {
-      print_msg(sprintf('Saving results in directory %s', $dir), $verbose, __FILE__, __LINE__);
+      print_msg(sprintf('Saving results in directory %s for iteration %d', $dir, $iteration), $verbose, __FILE__, __LINE__);
       foreach(array('nostore_traceroute' => 'traceroute.log') as $arg => $file) {
         $file = sprintf('%s/%s', $dir, $file);
         if (!isset($args[$arg]) && file_exists($file)) {
