@@ -277,12 +277,6 @@ class NetworkTest {
           'output' => trim(shell_exec('pwd')),
           'spacing' => 200,
           'test' => 'latency',
-          'throughput_same_continent' => 10,
-          'throughput_same_country' => 20,
-          'throughput_same_geo_region' => 30,
-          'throughput_same_provider' => 10,
-          'throughput_same_region' => 100,
-          'throughput_same_state' => 50,
           'throughput_size' => 5,
           'throughput_threads' => 2,
           'throughput_uri' => '/web-probe'
@@ -364,6 +358,13 @@ class NetworkTest {
         );
         $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type'));
         $this->verbose = isset($this->options['verbose']);
+        
+        // set default same size constraints if --throughput_size is not set
+        if (!isset($this->options['throughput_size'])) {
+          foreach(array('throughput_same_continent' => 10, 'throughput_same_country' => 20, 
+                        'throughput_same_geo_region' => 30, 'throughput_same_provider' => 10,
+                        'throughput_same_region' => 100, 'throughput_same_state' => 50) as $k => $v) $defaults[$k] = $v;
+        }
         
         foreach($defaults as $key => $val) {
           if (!isset($this->options[$key])) {
