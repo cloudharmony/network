@@ -360,6 +360,40 @@ are informational and used in conjunction with saving results (see save.sh)
 * throughput_https          If set, the protocol for throughput tests will 
                             default to https - otherwise it defaults to http
                             
+* throughput_inverse        If set, and a throughput test record contains both
+                            meta_compute_service_id and test_service_id, and 
+                            test_service_type is 'compute', and --test is 
+                            'downlink' OR 'uplink' (not 'throughput'), then 
+                            an inverse of each test record will be added to the
+                            results. The inverse record will use the same 
+                            metrics, but replace 'test' for the opposite type
+                            (e.g. download => uplink or uplink => downlink), 
+                            and the following test record attributes will be 
+                            substituted:
+                            
+                              meta_compute_service <=> test_service
+                              meta_compute_service_id <=> test_service_id
+                              meta_geo_region <=> test_geo_region
+                              meta_instance_id <=> test_instance_id
+                              meta_hostname <=> test_endpoint
+                              [ip of host] => test_ip
+                              meta_location <=> test_location
+                              meta_location_country <=> test_location_country
+                              meta_location_state <=> test_location_state
+                              meta_provider <=> test_provider
+                              meta_provider_id <=> test_provider_id
+                              meta_region <=> test_region
+                            
+                            Additionally, the following attributes will be 
+                            set to null:
+                              
+                              meta_cpu
+                              meta_memory
+                              meta_memory_gb
+                              meta_memory_mb
+                              meta_os_info
+                              meta_resource_id
+                            
 * throughput_same_continent Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 
                             continent as --test_endpoint. Overrides 
@@ -426,7 +460,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             
 * throughput_small_file     If set, --throughput_size is ignored and throughput 
                             tests are constrained to test files smaller than 
-                            256KB. Each thread of each request will randomly 
+                            128KB. Each thread of each request will randomly 
                             select one such file. When used, the 
                             throughput_size result value will be the average 
                             file size

@@ -31,9 +31,9 @@ class NetworkTest {
   
   /**
    * the max size in bytes for small file tests (see --throughput_small_file)
-   * 256KB
+   * 128KB
    */
-  const SMALL_FILE_LIMIT = 262144;
+  const SMALL_FILE_LIMIT = 131072;
   
   /**
    * set to TRUE if abort_threshold reached
@@ -243,6 +243,8 @@ class NetworkTest {
                 $results[$i][$key] = trim(is_array($this->options[$key]) ? implode(' ', $this->options[$key]) : $this->options[$key]);
                 if (!$results[$i][$key]) unset($results[$i][$key]);
               }
+              // meta attributes for inverse records
+              else if ($results[$i][$key] === FALSE) unset($results[$i][$key]);
             }
           }
         }
@@ -339,6 +341,7 @@ class NetworkTest {
           'test_service_id:',
           'test_service_type:',
           'throughput_https',
+          'throughput_inverse',
           'throughput_same_continent:',
           'throughput_same_country:',
           'throughput_same_geo_region:',
@@ -584,8 +587,10 @@ class NetworkTest {
       }
       
       $tests = array_key_exists($i, $this->options['test']) ? $this->options['test'][$i] : $this->options['test'][0];
+      $isThroughput = FALSE;
       // replace throughput with downlink + uplink
       if (in_array('throughput', $tests)) {
+        $isThroughput = TRUE;
         if (!in_array('downlink', $tests)) $tests[] = 'downlink';
         if (!in_array('uplink', $tests)) $tests[] = 'uplink';
         unset($tests[array_search('throughput', $tests)]);
@@ -741,6 +746,41 @@ class NetworkTest {
             print_msg(sprintf('metrics: [%s]', implode(', ', $row['metrics'])), $this->verbose, __FILE__, __LINE__);
             unset($row['metrics']);
             $this->results[] = $row;
+            
+            // add inverse throughput record
+            if (isset($this->options['throughput_inverse']) && !$isThroughput && 
+                isset($this->options['meta_compute_service_id']) && isset($row['test_service_id']) && 
+                isset($row['test_service_type']) && $row['test_service_type'] == 'compute') {
+              print_msg(sprintf('Generating %s inverse throughput record from [%s] [%s]', $row['test'], implode(', ', array_keys($row)), implode(', ', $row)), $this->verbose, __FILE__, __LINE__);
+              $nrow = array();
+              foreach($row as $k => $v) $nrow[$k] = $v;
+              $nrow['test'] = $row['test'] == 'uplink' ? 'downlink' : 'uplink';
+              // meta attributes that should not be set
+              foreach(array('meta_cpu', 'meta_memory', 'meta_memory_gb', 'meta_memory_mb', 'meta_os_info', 'meta_resource_id') as $k) $nrow[$k] = FALSE;
+              foreach(array('meta_compute_service' => 'test_service', 
+                            'meta_compute_service_id' => 'test_service_id', 
+                            'meta_geo_region' => 'test_geo_region', 
+                            'meta_instance_id' => 'test_instance_id',
+                            'meta_hostname' => 'test_endpoint', 
+                            'meta_location' => 'test_location',
+                            'meta_location_country' => 'test_location_country', 
+                            'meta_location_state' => 'test_location_state',
+                            'meta_provider' => 'test_provider',
+                            'meta_provider_id' => 'test_provider_id',
+                            'meta_region' => 'test_region') as $meta => $attr) {
+                if (isset($nrow[$attr])) $nrow[$meta] = $meta == 'meta_hostname' ? get_hostname($nrow[$attr]) : $nrow[$attr];
+                else $nrow[$meta] = FALSE;
+                
+                $v = isset($this->options[$meta]) ? $this->options[$meta] : ($meta == 'meta_hostname' ? trim(shell_exec('hostname')) : NULL);
+                if ($v) $nrow[$attr] = $v;
+                else if (isset($nrow[$attr])) unset($nrow[$attr]);
+              }
+              if (!isset($this->myip)) $this->myip = trim(shell_exec(sprintf('curl -q http://app%d.cloudharmony.com/myip 2>/dev/null', rand(1, 2))));
+              if ($this->myip) $nrow['test_ip'] = $this->myip;
+              else if (isset($nrow['test_ip'])) unset($nrow['test_ip']);
+              $this->results[] = $nrow;
+              print_msg(sprintf('Added %s inverse throughput record [%s] [%s]', $nrow['test'], implode(', ', array_keys($nrow)), implode(', ', $nrow)), $this->verbose, __FILE__, __LINE__);
+            }
           }
           else {
             print_msg(sprintf('%s test for endpoint %s failed', $test, $endpoint), $this->verbose, __FILE__, __LINE__, TRUE);
