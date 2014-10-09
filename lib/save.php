@@ -21,14 +21,15 @@
 require_once(dirname(__FILE__) . '/NetworkTest.php');
 require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
 $status = 1;
-$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'v' => 'verbose'), array('params_file'), 'save_');
+$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'recursive_order:', 'recursive_count:', 'v' => 'verbose'), array('params_file'), 'save_');
+$verbose = isset($args['verbose']);
 
 // save to multiple repositories (multiple --params_file parameters)
 if (isset($args['params_file']) && count($args['params_file']) > 1) {
   $cmd = __FILE__;
   for($i=1; $i<count($argv); $i++) if ($argv[$i] != '--params_file' && !in_array($argv[$i], $args['params_file'])) $cmd .= ' ' . $argv[$i]; 
-  foreach($args['params_file'] as $pfile) {
-    $pcmd = sprintf('%s --params_file %s', $cmd, $pfile);
+  foreach($args['params_file'] as $i => $pfile) {
+    $pcmd = sprintf('%s --params_file %s --recursive_order %d --recursive_count %d', $cmd, $pfile, $i+1, count($args['params_file']));
     print($pcmd . "\n\n");
     passthru($pcmd);
   }
@@ -48,38 +49,52 @@ if ($db =& BenchmarkDb::getDb()) {
   // get results from each directory
   foreach($dirs as $i => $dir) {
     $test = new NetworkTest($dir);
+    $runOptions = $test->getRunOptions();
+    if (!$verbose && isset($runOptions['verbose'])) $verbose = TRUE;
+    
     $iteration = isset($args['iteration']) && preg_match('/([0-9]+)/', $args['iteration'], $m) ? $m[1]*1 : $i + 1;
     if ($results = $test->getResults()) {
-      print_msg(sprintf('Saving results in directory %s', $dir), isset($args['verbose']), __FILE__, __LINE__);
+      print_msg(sprintf('Saving results in directory %s', $dir), $verbose, __FILE__, __LINE__);
       foreach(array('nostore_traceroute' => 'traceroute.log') as $arg => $file) {
         $file = sprintf('%s/%s', $dir, $file);
         if (!isset($args[$arg]) && file_exists($file)) {
           $pieces = explode('_', $arg);
           $col = $pieces[count($pieces) - 1];
           $saved = $db->saveArtifact($file, $col);
-          if ($saved) print_msg(sprintf('Saved %s successfully', basename($file)), isset($args['verbose']), __FILE__, __LINE__);
-          else if ($saved === NULL) print_msg(sprintf('Unable to save %s', basename($file)), isset($args['verbose']), __FILE__, __LINE__, TRUE);
-          else print_msg(sprintf('Artifact %s will not be saved because --store was not specified', basename($file)), isset($args['verbose']), __FILE__, __LINE__);
+          if ($saved) print_msg(sprintf('Saved %s successfully', basename($file)), $verbose, __FILE__, __LINE__);
+          else if ($saved === NULL) print_msg(sprintf('Unable to save %s', basename($file)), $verbose, __FILE__, __LINE__, TRUE);
+          else print_msg(sprintf('Artifact %s will not be saved because --store was not specified', basename($file)), $verbose, __FILE__, __LINE__);
         }
-        else if (file_exists($file)) print_msg(sprintf('Artifact %s will not be saved because --%s was set', basename($file), $arg), isset($args['verbose']), __FILE__, __LINE__);
+        else if (file_exists($file)) print_msg(sprintf('Artifact %s will not be saved because --%s was set', basename($file), $arg), $verbose, __FILE__, __LINE__);
       }
       foreach(array_keys($results) as $n) {
         $results[$n]['iteration'] = $iteration;
-        if ($db->addRow('network', $results[$n])) print_msg(sprintf('Successfully saved test results'), isset($args['verbose']), __FILE__, __LINE__);
-        else print_msg(sprintf('Failed to save test results'), isset($args['verbose']), __FILE__, __LINE__, TRUE); 
+        if ($db->addRow('network', $results[$n])) print_msg(sprintf('Successfully added test result row'), $verbose, __FILE__, __LINE__);
+        else print_msg(sprintf('Failed to save test results'), $verbose, __FILE__, __LINE__, TRUE); 
       }
     }
-    else print_msg(sprintf('Unable to save results in directory %s - are result files present?', $dir), isset($args['verbose']), __FILE__, __LINE__, TRUE);
+    else print_msg(sprintf('Unable to save results in directory %s - are result files present?', $dir), $verbose, __FILE__, __LINE__, TRUE);
   }
   
   // finalize saving of results
   if ($db->save()) {
-    print_msg(sprintf('Successfully saved test results from directory %s', $dir), isset($args['verbose']), __FILE__, __LINE__);
+    print_msg(sprintf('Successfully saved test results from directory %s', $dir), $verbose, __FILE__, __LINE__);
     $status = 0;
   }
   else {
-    print_msg(sprintf('Unable to save test results from directory %s', $dir), isset($args['verbose']), __FILE__, __LINE__, TRUE);
+    print_msg(sprintf('Unable to save test results from directory %s', $dir), $verbose, __FILE__, __LINE__, TRUE);
     $status = 1;
+  }
+  
+  // check for --min_runtime test option
+  if ((!isset($args['recursive_order']) || (isset($args['recursive_count']) && $args['recursive_order'] == $args['recursive_count'])) && 
+      isset($runOptions['min_runtime']) && isset($runOptions['min_runtime_in_save']) && 
+      is_numeric($runOptions['min_runtime']) && isset($runOptions['run_start']) && is_numeric($runOptions['run_start']) &&
+      time() < ($runOptions['run_start'] + $runOptions['min_runtime'])) {
+    $sleep = ($runOptions['run_start'] + $runOptions['min_runtime']) - time();
+    print_msg(sprintf('Testing complete and --min_runtime %d has not been acheived. Sleeping for %d seconds', $runOptions['min_runtime'], $sleep), $verbose, __FILE__, __LINE__);
+    sleep($sleep);
+    print_msg(sprintf('Sleep complete'), $verbose, __FILE__, __LINE__);
   }
 }
 

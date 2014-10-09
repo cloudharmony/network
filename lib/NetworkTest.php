@@ -313,6 +313,7 @@ class NetworkTest {
           'meta_run_id:',
           'meta_test_id:',
           'min_runtime:',
+          'min_runtime_in_save',
           'output:',
           'params_url:',
           'params_url_service_type:',
@@ -360,6 +361,7 @@ class NetworkTest {
           'v' => 'verbose'
         );
         $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type'));
+        $this->options['run_start'] = time();
         $this->verbose = isset($this->options['verbose']);
         
         // set default same size constraints if --throughput_size is not set
@@ -809,7 +811,7 @@ class NetworkTest {
     }
     if ($success) {
       $this->endTest();
-      if (isset($this->options['min_runtime']) && ($testStarted + $this->options['min_runtime']) > time()) {
+      if (isset($this->options['min_runtime']) && !isset($this->options['min_runtime_in_save']) && ($testStarted + $this->options['min_runtime']) > time()) {
         $sleep = ($testStarted + $this->options['min_runtime']) - time();
         print_msg(sprintf('Testing complete and --min_runtime %d has not been acheived. Sleeping for %d seconds', $this->options['min_runtime'], $sleep), $this->verbose, __FILE__, __LINE__);
         sleep($sleep);

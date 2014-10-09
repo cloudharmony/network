@@ -132,6 +132,8 @@ are informational and used in conjunction with saving results (see save.sh)
                             completes before this time is reached, the process
                             will sleep for the remaining duration
                             
+* min_runtime_in_save       If set, --min_runtime will be applied by save.sh
+                            
 * output                    The output directory for writing test artifacts. If 
                             not specified, the current working directory will
                             be used
