@@ -598,7 +598,7 @@ function parse_args($opts, $arrayArgs=NULL, $paramPrefix='') {
     // set array parameters
     if (is_array($arrayArgs)) {
       if (isset($options[$key]) && in_array($key, $arrayArgs) && !is_array($options[$key])) {
-        $pieces = explode(',', $options[$key]);
+        $pieces = explode(preg_match('/|/', $options[$key]) ? '|' : ',', $options[$key]);
         $options[$key] = array();
         foreach($pieces as $v) $options[$key][] = trim($v);
       }

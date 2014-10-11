@@ -465,6 +465,10 @@ are informational and used in conjunction with use of save.sh
                             of rates in Mb/s)
                             Default is 5
                             
+--throughput_slowest_thread If set, throughput metrics will be based on the 
+                            speed of the slowest thread instead of average 
+                            speed X number of threads
+                            
 --throughput_small_file     If set, --throughput_size is ignored and throughput 
                             tests are constrained to test files smaller than 
                             256KB. Each thread of each request will randomly 

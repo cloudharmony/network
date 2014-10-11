@@ -352,6 +352,7 @@ class NetworkTest {
           'throughput_same_state:',
           'throughput_samples:',
           'throughput_size:',
+          'throughput_slowest_thread',
           'throughput_small_file',
           'throughput_threads:',
           'throughput_time',
@@ -1064,10 +1065,13 @@ class NetworkTest {
               $times = array();
               $bytes = 0;
               $numRequests = count($response['results']);
+              $slowestThread = NULL;
               foreach($response['results'] as $result) {
                 print_msg(sprintf('Adding curl result [%s] [%s]', implode(', ', array_keys($result)), implode(', ', $result)), $this->verbose, __FILE__, __LINE__);
                 $speeds[] = $result['speed'];
-                $times[] = $result['time']*1000;
+                $time = $result['time']*1000;
+                $times[] = $time;
+                if (!$slowestThread || $time > $slowestThread) $slowestThread = $time;
                 $bytes += $result['transfer'];
               }
               $mbTransferred = round(($bytes/1024)/1024, 6);
@@ -1081,7 +1085,7 @@ class NetworkTest {
                 }
                 $avgMbs = round((((array_sum($speeds)/count($speeds))*8)/1024)/1024, 6);
                 $avgTime = round(array_sum($times)/count($times), 6);
-                $totalMbs = $avgMbs*$numRequests;
+                $totalMbs = isset($this->options['throughput_slowest_thread']) ? ($mbTransferred*8)/$slowestThread : $avgMbs*$numRequests;
                 $metrics['metrics'][] = isset($this->options['throughput_time']) ? $avgTime : $totalMbs;
                 $metrics['throughput_size'][] = round((($bytes/1024)/1024)/$numRequests, 6);
                 if (!$ping) $metrics['throughput_transfer'] += $mbTransferred;
@@ -1161,7 +1165,7 @@ class NetworkTest {
       'throughput_same_state' => array('max' => 1024, 'min' => 1),
       'throughput_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'throughput_size' => array('max' => 1024, 'min' => 0, 'required' => TRUE),
-      'throughput_threads' => array('max' => 10, 'min' => 1, 'required' => TRUE),
+      'throughput_threads' => array('max' => 32, 'min' => 1, 'required' => TRUE),
       'throughput_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE)
     );
     $validated = validate_options($this->getRunOptions(), $validate);
