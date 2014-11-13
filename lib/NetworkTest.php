@@ -271,7 +271,8 @@ class NetworkTest {
           'dns_samples' => 10,
           'dns_timeout' => 5,
           'geo_regions' => 'us_west us_central us_east canada eu_west eu_central eu_east oceania asia america_south africa',
-          'latency_samples' => 10,
+          'latency_interval' => 0.2,
+          'latency_samples' => 50,
           'latency_timeout' => 3,
           'meta_cpu' => $sysInfo['cpu'],
           'meta_memory' => $sysInfo['memory_gb'] > 0 ? $sysInfo['memory_gb'] . ' GB' : $sysInfo['memory_mb'] . ' MB',
@@ -294,6 +295,7 @@ class NetworkTest {
           'dns_timeout:',
           'geoiplookup',
           'geo_regions:',
+          'latency_interval:',
           'latency_samples:',
           'latency_skip:',
           'latency_timeout:',
@@ -925,9 +927,10 @@ class NetworkTest {
   private function testLatency($endpoint) {
     $metrics = NULL;
     if ($endpoint = get_hostname($endpoint)) {
+      $interval = $this->options['latency_interval'];
       $samples = $this->options['latency_samples'];
       $timeout = $this->options['latency_timeout'];
-      $cmd = sprintf('ping -c %d -W %d %s 2>/dev/null; echo $?', $samples, $timeout, $endpoint);
+      $cmd = sprintf('ping -i %s -c %d -W %d %s 2>/dev/null; echo $?', $interval, $samples, $timeout, $endpoint);
       print_msg(sprintf('Testing latency using ping command: %s', $cmd), $this->verbose, __FILE__, __LINE__);
 			if ($buffer = shell_exec($cmd)) {
 				$pieces = explode("\n", trim($buffer));
@@ -1144,6 +1147,7 @@ class NetworkTest {
       'dns_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'dns_timeout' => array('max' => 60, 'min' => 1, 'required' => TRUE),
       'geo_regions' => array('option' => array_keys($this->getGeoRegions())),
+      'latency_interval' => array('max' => 10, 'min' => 0, 'required' => TRUE),
       'latency_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'latency_timeout' => array('max' => 30, 'min' => 1, 'required' => TRUE),
       'max_runtime' => array('min' => 10),
