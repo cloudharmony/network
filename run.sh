@@ -93,7 +93,7 @@ are informational and used in conjunction with use of save.sh
                             seconds. Default is 0.2
                             
 --latency_samples           The number of test samples for latency tests. 
-                            Default is 50
+                            Default is 100
                             
 --latency_skip              Endpoint, service or provider ID to ignore latency 
                             tests for. May be repeated for multiple

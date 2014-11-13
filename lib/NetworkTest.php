@@ -272,7 +272,7 @@ class NetworkTest {
           'dns_timeout' => 5,
           'geo_regions' => 'us_west us_central us_east canada eu_west eu_central eu_east oceania asia america_south africa',
           'latency_interval' => 0.2,
-          'latency_samples' => 50,
+          'latency_samples' => 100,
           'latency_timeout' => 3,
           'meta_cpu' => $sysInfo['cpu'],
           'meta_memory' => $sysInfo['memory_gb'] > 0 ? $sysInfo['memory_gb'] . ' GB' : $sysInfo['memory_mb'] . ' MB',
