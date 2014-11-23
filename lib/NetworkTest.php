@@ -345,6 +345,7 @@ class NetworkTest {
           'test_service_type:',
           'throughput_https',
           'throughput_inverse',
+          'throughput_keepalive',
           'throughput_same_continent:',
           'throughput_same_country:',
           'throughput_same_geo_region:',
@@ -360,10 +361,12 @@ class NetworkTest {
           'throughput_time',
           'throughput_timeout:',
           'throughput_uri:',
+          'throughput_use_mean',
+          'throughput_webpage:',
           'traceroute',
           'v' => 'verbose'
         );
-        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type'));
+        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_webpage'));
         $this->options['run_start'] = time();
         $this->verbose = isset($this->options['verbose']);
         
@@ -509,6 +512,21 @@ class NetworkTest {
             $pieces = explode(',', $location);
             $this->options['test_location_country'][$i] = strtoupper(trim($pieces[count($pieces) - 1]));
             $this->options['test_location_state'][$i] = count($pieces) > 1 ? trim($pieces[0]) : NULL;
+          }
+        }
+        
+        // expand throughput_webpage
+        if (isset($this->options['throughput_webpage'])) {
+          foreach($this->options['throughput_webpage'] as $i => $resource) {
+            $resources = array();
+            foreach(explode(',', $resource) as $e1) {
+              foreach(explode(' ', $e1) as $e2) {
+                $e2 = trim($e2);
+                $resources[] = $e2;
+              }
+            }
+            if ($resources) $this->options['throughput_webpage'][$i] = $resources;
+            else unset($this->options['throughput_webpage'][$i]);
           }
         }
         
@@ -979,16 +997,18 @@ class NetworkTest {
       foreach(isset($this->options['throughput_https']) ? array('https', 'http') : array('http') as $proto) $endpoints[] = sprintf('%s://%s', $proto, $endpoint);
     }
     
-    foreach(array_keys($endpoints) as $i) {
-      // add base URI suffix
-      if (!preg_match('/^https?:\/\/.*\//', $endpoints[$i])) $endpoints[$i] = sprintf('%s%s%s', $endpoints[$i], substr($this->options['throughput_uri'], 0, 1) != '/' ? '/' : '', $this->options['throughput_uri']);
-      // remove trailing /
-      else if (substr($endpoints[$i], -1, 1) == '/') $endpoints[$i] = substr($endpoints[$i], 0, strlen($endpoints[$i]) - 1);
+    if (!isset($this->options['throughput_webpage'])) {
+      foreach(array_keys($endpoints) as $i) {
+        // add base URI suffix
+        if (!preg_match('/^https?:\/\/.*\//', $endpoints[$i])) $endpoints[$i] = sprintf('%s%s%s', $endpoints[$i], substr($this->options['throughput_uri'], 0, 1) != '/' ? '/' : '', $this->options['throughput_uri']);
+        // remove trailing /
+        else if (substr($endpoints[$i], -1, 1) == '/') $endpoints[$i] = substr($endpoints[$i], 0, strlen($endpoints[$i]) - 1);
+      } 
     }
     
     $samples = $this->options['throughput_samples'];
     $ping = FALSE;
-    if (!isset($this->options['throughput_small_file'])) {
+    if (!isset($this->options['throughput_small_file']) && !isset($this->options['throughput_webpage'])) {
       $sizeMb = $this->options['throughput_size'];
 
       // adjust size for same constraints
@@ -1016,12 +1036,12 @@ class NetworkTest {
     $serviceType = isset($this->options['test_service_type']) && array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
     $expectedBytes = 0;
     foreach($endpoints as $endpoint) {
-      print_msg(sprintf('Attempting %s test using base URI %s; samples: %d; size: %s MB; threads: %d; timeout: %d', $type, $endpoint, $samples, isset($this->options['throughput_small_file']) ? 'rand small file' : $sizeMb, $threads, $timeout), $this->verbose, __FILE__, __LINE__);
+      print_msg(sprintf('Attempting %s test using base URI %s; samples: %d; size: %s MB; threads: %d; timeout: %d', $type, $endpoint, $samples, isset($this->options['throughput_small_file']) ? 'rand small file' : (isset($this->options['throughput_webpage']) ? 'full page test' : $sizeMb), $threads, $timeout), $this->verbose, __FILE__, __LINE__);
       $requests = array();
       for($i=0; $i<$threads; $i++) {
         $request = array('method' => $uplink ? 'POST' : 'GET');
         if ($uplink) $request['url'] = $url = sprintf('%s/up.html', $endpoint);
-        if (!isset($this->options['throughput_small_file'])) {
+        if (!isset($this->options['throughput_small_file']) && !isset($this->options['throughput_webpage'])) {
           if ($uplink) {
             $request['body'] = $size;
             $expectedBytes += $size;
@@ -1036,8 +1056,34 @@ class NetworkTest {
         print_msg(sprintf('Added curl request [%s] [%s] to test', implode(', ', array_keys($request)), implode(', ', $request)), $this->verbose, __FILE__, __LINE__);
       }
       for($i=0; $i<$samples; $i++) {
+        // full page test
+        if (isset($this->options['throughput_webpage'])) {
+          $url = $endpoint;
+          $resources = isset($this->options['throughput_webpage'][$idx]) ? $this->options['throughput_webpage'][$idx] : $this->options['throughput_webpage'][0];
+          // prefix resources with endpoint if necessary
+          foreach(array_keys($resources) as $k) {
+            if (!preg_match('/^http/', $resources[$k])) $resources[$k] = sprintf('%s%s%s', $endpoint, substr($resources[$k], 0, 1) == '/' ? '' : '/', $resources[$k]);
+          }
+          sort($resources);
+          if (count($resources) < $threads) {
+            print_msg(sprintf('Reducing number of threads from %d to %d to match number of page resources', $threads, count($resources)), $this->verbose, __FILE__, __LINE__);
+            $requests = array_slice($requests, 0, count($resources));
+            $threads = count($resources);
+            $this->options['throughput_threads'] = $threads;
+          }
+          $resourcesPerThread = round(count($resources)/$threads);
+          $resourcesFirstThread = count($resources) - (($threads - 1) * $resourcesPerThread);
+          print_msg(sprintf('Dividing resources [%s] evenly for %d threads [%d resources for first thread; %d resources others]', implode(', ', $resources), $threads, $resourcesFirstThread, $resourcesPerThread), $this->verbose, __FILE__, __LINE__);
+          $slicePtr = 0;
+          foreach(array_keys($requests) as $n) {
+            $requests[$n]['url'] = array_slice($resources, $slicePtr, $n == 0 ? $resourcesFirstThread : $resourcesPerThread);
+            $slicePtr += ($n == 0 ? $resourcesFirstThread : $resourcesPerThread);
+            print_msg(sprintf('Thread %d assigned requests [%s]', $n+1, implode(', ', $requests[$n]['url'])), $this->verbose, __FILE__, __LINE__);
+          }
+          $expectedBytes = NULL;
+        }
         // choose random small file URLs/upload sizes
-        if (isset($this->options['throughput_small_file'])) {
+        else if (isset($this->options['throughput_small_file'])) {
           $expectedBytes = 0;
           foreach(array_keys($requests) as $n) {
             $size = rand(1, self::SMALL_FILE_LIMIT);
@@ -1052,6 +1098,24 @@ class NetworkTest {
             }
             print_msg(sprintf('Added small file request for size %d and URL %s', $size, $requests[$n]['url']), $this->verbose, __FILE__, __LINE__);
           }
+        }
+        // duplicate requests for # of samples when throughput_keepalive is set
+        if (isset($this->options['throughput_keepalive']) && $samples > 1 && !isset($this->options['throughput_webpage'])) {
+          print_msg(sprintf('Duplicating requests for %d samples because throughput_keepalive is set', $samples), $this->verbose, __FILE__, __LINE__);
+          foreach(array_keys($requests) as $n) {
+            $requests[$n]['url'] = array($requests[$n]['url']);
+            for($x=1; $x<$samples; $x++) {
+              if (isset($this->options['throughput_small_file']) && !$uplink) {
+                $size = rand(1, self::SMALL_FILE_LIMIT);
+                $file = $this->getDownlinkFile($size, $serviceType);
+                $requests[$n]['url'][] = sprintf('%s/%s', $endpoint, $file['name']);
+                $expectedBytes += $file['size'];
+              }
+              else $requests[$n]['url'][] = $requests[$n]['url'][0];
+            }
+            print_msg(sprintf('New URLs for request %d: %s', $n+1, implode('; ', $requests[$n]['url'])), $this->verbose, __FILE__, __LINE__);
+          }
+          if (!isset($this->options['throughput_small_file']) || $uplink) $expectedBytes *= $samples;
         }
         
         // spacing
@@ -1070,15 +1134,18 @@ class NetworkTest {
               $numRequests = count($response['results']);
               $slowestThread = NULL;
               foreach($response['results'] as $result) {
-                print_msg(sprintf('Adding curl result [%s] [%s]', implode(', ', array_keys($result)), implode(', ', $result)), $this->verbose, __FILE__, __LINE__);
-                $speeds[] = $result['speed'];
-                $time = $result['time']*1000;
-                $times[] = $time;
-                if (!$slowestThread || $time > $slowestThread) $slowestThread = $time;
-                $bytes += $result['transfer'];
+                print_msg(sprintf('Adding curl result %s', implode(', ', array_keys($result))), $this->verbose, __FILE__, __LINE__);
+                foreach(is_array($result['speed']) ? $result['speed'] : array($result['speed']) as $s) $speeds[] = round((($s*8)/1024)/1024, 6);
+                foreach(is_array($result['time']) ? $result['time'] : array($result['time']) as $t) {
+                  $time = $t*1000;
+                  $times[] = $time;
+                  if (!$slowestThread || $time > $slowestThread) $slowestThread = $time;
+                }
+                foreach(is_array($result['transfer']) ? $result['transfer'] : array($result['transfer']) as $b) $bytes += $b;
               }
+              print_msg(sprintf('Got curl results. speed: [%s]; time: [%s]; total transfer: %d', implode(', ', $speeds), implode(', ', $times), $bytes), $this->verbose, __FILE__, __LINE__);
               $mbTransferred = round(($bytes/1024)/1024, 6);
-              if (!$ping && $bytes < ($expectedBytes*0.85)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
+              if (isset($expectedBytes) && !$ping && $bytes < ($expectedBytes*0.85)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
               else {
                 if (!isset($metrics)) {
                   $metrics = array('metrics' => array(), 'throughput_size' => array(), 'throughput_threads' => $threads);
@@ -1086,13 +1153,16 @@ class NetworkTest {
                   if (isset($this->options['throughput_small_file'])) $metrics['throughput_small_file'] = TRUE;
                   if (!$ping) $metrics['throughput_transfer'] = 0;
                 }
-                $avgMbs = round((((array_sum($speeds)/count($speeds))*8)/1024)/1024, 6);
-                $avgTime = round(array_sum($times)/count($times), 6);
-                $totalMbs = isset($this->options['throughput_slowest_thread']) ? ($mbTransferred*8)/$slowestThread : $avgMbs*$numRequests;
-                $metrics['metrics'][] = isset($this->options['throughput_time']) ? $avgTime : $totalMbs;
+                $meanMbs = get_mean($speeds, 6);
+                $medianMbs = get_median($speeds, 6);
+                $meanTime = get_mean($times, 6);
+                $medianTime = get_median($times, 6);
+                $totalMbs = isset($this->options['throughput_slowest_thread']) ? ($mbTransferred*8)/$slowestThread : (isset($this->options['throughput_use_mean']) ? $meanMbs : $medianMbs)*$numRequests;
+                $totalTime = (isset($this->options['throughput_use_mean']) ? $meanTime : $medianTime)*$numRequests;
+                $metrics['metrics'][] = isset($this->options['throughput_time']) ? (isset($this->options['throughput_webpage']) ? $totalTime : (isset($this->options['throughput_use_mean']) ? $meanTime : $medianTime)) : $totalMbs;
                 $metrics['throughput_size'][] = round((($bytes/1024)/1024)/$numRequests, 6);
                 if (!$ping) $metrics['throughput_transfer'] += $mbTransferred;
-                print_msg(sprintf('Test sample %d of %d for URL %s successful. Average rate is %s Mb/s. Average time is %s ms. Total rate is %s Mb/s. %s MB transfer on %d reqs', $i+1, $samples, $url, round($avgMbs, 4), $avgTime, round($totalMbs, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
+                print_msg(sprintf('Test sample %d of %d for URL %s successful. Mean/median rate is [%s %s] Mb/s. Mean/median time is [%s %s] ms. Total rate is %s Mb/s. Total time is %s. %s MB transfer on %d reqs', $i+1, $samples, $url, $meanMbs, $medianMbs, $meanTime, $medianTime, round($totalMbs, 4), round($totalTime, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
               }
             }
             else print_msg(sprintf('curl request(s) failed for URL %s because highest status %d is not 2XX', $url, $response['highest_status']), $this->verbose, __FILE__, __LINE__, TRUE);
@@ -1102,12 +1172,16 @@ class NetworkTest {
         else print_msg(sprintf('curl request(s) failed for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
         
         if (!$metrics && (!$response || !isset($response['lowest_status']) || $response['lowest_status'] >= 300)) break;
+        if (isset($this->options['throughput_keepalive']) && !isset($this->options['throughput_webpage'])) {
+          print_msg(sprintf('Throughput test ending because throughput_keepalive was set'), $this->verbose, __FILE__, __LINE__);
+          break;
+        }
       }
       if ($metrics) {
         $metrics['throughput_size'] = $ping ? 0 : round(array_sum($metrics['throughput_size'])/count($metrics['throughput_size']), 6);
         if (isset($this->options['throughput_time'])) $metrics['throughput_time'] = TRUE;
-				$metrics['tests_failed'] = $samples - count($metrics['metrics']);
-				$metrics['tests_success'] = count($metrics['metrics']);
+				$metrics['tests_failed'] = isset($this->options['throughput_keepalive']) && !isset($this->options['throughput_webpage']) && count($metrics['metrics']) ? 0 : $samples - count($metrics['metrics']);
+				$metrics['tests_success'] = isset($this->options['throughput_keepalive']) && !isset($this->options['throughput_webpage']) && count($metrics['metrics']) ? $samples : count($metrics['metrics']);
         print_msg(sprintf('%s testing completed with %d successful, %d failed using endpoint %s. Metrics are [%s] %s', $type, $metrics['tests_success'], $metrics['tests_failed'], $endpoint, implode(', ', $metrics['metrics']), isset($this->options['throughput_time']) ? 'ms' : 'Mb/s'), $this->verbose, __FILE__, __LINE__);
         break;
       }
@@ -1189,7 +1263,7 @@ class NetworkTest {
     
     // validate test_endpoint association parameters
     if (!isset($validated['test_endpoint']) && count($this->options['test_endpoint']) && !isset($this->options['service_lookup']) && !isset($this->options['geoiplookup'])) {
-      foreach(array('test_instance_id', 'test_location', 'test_private_network_type', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type') as $param) {
+      foreach(array('test_instance_id', 'test_location', 'test_private_network_type', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_webpage') as $param) {
         if (!isset($validated[$param]) && isset($this->options[$param]) && count($this->options[$param]) != 1 && count($this->options[$param]) != count($this->options['test_endpoint'])) {
           $validated[$param] = sprintf('The --%s parameter can be specified once [same for all test_endpoint] or %d times [different for each test_endpoint]', $param, count($this->options[$param]));
         }

@@ -74,7 +74,8 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
 /**
  * invokes 1 or more http requests using curl, waits until they are completed, 
  * and returns the associated results. Return value is a hash containing the 
- * following keys:
+ * following keys. Note: elements in urls, response and results may be arrays 
+ * if any 'url' values in $requests are arrays
  *   urls:     ordered array of URLs
  *   request:  ordered array of request headers (lowercase keys)
  *   response: ordered array of response headers (lowercase keys)
@@ -92,7 +93,8 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
  * element in this array is a hash with the following possible keys:
  *   method:  http method (default is GET)
  *   headers: hash defining http headers to append
- *   url:     the URL
+ *   url:     the URL - may be an array to specify multiple (will use keep 
+ *            alive)
  *   input:   optional command to pipe into the curl process as the body
  *   body:    optional string or file to pipe into the curl process as the 
  *            body. Alternatively, if this is a numeric value, a file will 
@@ -149,12 +151,14 @@ function ch_curl_mt($requests, $timeout=60, $dir='/tmp', $retBody=FALSE, $insecu
       $bfiles[$i] = sprintf('%s/%s', $dir, 'curl_body_' . rand());
       $body = $bfiles[$i];
     }
-    $cmd = (isset($request['input']) ? $request['input'] . ' | curl --data-binary @-' : 'curl') . ($method == 'HEAD' ? ' -I' : '') . ' -s -o ' . $body . ' -D - -w "transfer=%{' . ($method == 'GET' ? 'size_download' : 'size_upload') . '}\nspeed=%{' . ($method == 'GET' ? 'speed_download' : 'speed_upload') . '}\ntime=%{time_total}\nurl=%{url_effective}" -X ' . $method . ($insecure ? ' --insecure' : '') . (is_numeric($timeout) && $timeout>0 ? ' --max-time ' . $timeout : '');
+    $cmd = (isset($request['input']) ? $request['input'] . ' | curl --data-binary @-' : 'curl') . ($method == 'HEAD' ? ' -I' : '') . ' -s -D - -w "transfer=%{' . ($method == 'GET' ? 'size_download' : 'size_upload') . '}\nspeed=%{' . ($method == 'GET' ? 'speed_download' : 'speed_upload') . '}\ntime=%{time_total}\nurl=%{url_effective}\n" -X ' . $method . ($insecure ? ' --insecure' : '') . (is_numeric($timeout) && $timeout>0 ? ' --max-time ' . $timeout : '');
     $result['request'][$i] = $request['headers'];
     foreach($request['headers'] as $header => $val) $cmd .= sprintf(' -H "%s: %s"', $header, $val);
     if (isset($request['range'])) $cmd .= ' -r ' . $request['range'];
     $result['urls'][$i] = $request['url'];
-    $cmd .= sprintf(' "%s"', $request['url']);
+    if (!is_array($request['url'])) $request['url'] = array($request['url']);
+    foreach($request['url'] as $url) $cmd .= sprintf(' -o %s', $body);
+    foreach($request['url'] as $url) $cmd .= sprintf(' "%s"', $url);
     $ofiles[$i] = sprintf('%s/%s', $dir, 'curl_output_' . rand());
     fwrite($fp, sprintf("%s > %s 2>&1 &\n", $cmd, $ofiles[$i]));
   }
@@ -169,14 +173,27 @@ function ch_curl_mt($requests, $timeout=60, $dir='/tmp', $retBody=FALSE, $insecu
       // status code
       if (preg_match('/HTTP[\S]+\s+([0-9]+)\s/', $line, $m)) {
         $status = $m[1]*1;
-        $result['status'][$i] = $status;
+        if (isset($result['status'][$i]) && !is_array($result['status'][$i])) $result['status'][$i] = array($result['status'][$i]);
+        if (isset($result['status'][$i]) && is_array($result['status'][$i])) $result['status'][$i][] = $status;
+        else $result['status'][$i] = $status;
+        
         if ($result['lowest_status'] === 0 || $status < $result['lowest_status']) $result['lowest_status'] = $status;
         if ($status > $result['highest_status']) $result['highest_status'] = $status;
       }
       // response header
-      else if (preg_match('/^([^:]+):\s+"?([^"]+)"?$/', trim($line), $m)) $result['response'][$i][trim(strtolower($m[1]))] = $m[2];
+      else if (preg_match('/^([^:]+):\s+"?([^"]+)"?$/', trim($line), $m)) {
+        $k = trim(strtolower($m[1]));
+        if (isset($result['response'][$i][$k]) && !is_array($result['response'][$i][$k])) $result['response'][$i][$k] = array($result['response'][$i][$k]);
+        if (isset($result['response'][$i][$k]) && is_array($result['response'][$i][$k])) $result['response'][$i][$k][] = $m[2];
+        else $result['response'][$i][$k] = $m[2];
+      }
       // result value
-      else if (preg_match('/^([^=]+)=(.*)$/', trim($line), $m)) $result['results'][$i][trim(strtolower($m[1]))] = $m[2];
+      else if (preg_match('/^([^=]+)=(.*)$/', trim($line), $m)) {
+        $k = trim(strtolower($m[1]));
+        if (isset($result['results'][$i][$k]) && !is_array($result['results'][$i][$k])) $result['results'][$i][$k] = array($result['results'][$i][$k]);
+        if (isset($result['results'][$i][$k]) && is_array($result['results'][$i][$k])) $result['results'][$i][$k][] = $m[2];
+        else $result['results'][$i][$k] = $m[2];
+      }
       // body
       if (isset($bfiles[$i]) && file_exists($bfiles[$i])) {
         $result['body'][$i] = file_get_contents($bfiles[$i]);

@@ -405,6 +405,12 @@ are informational and used in conjunction with use of save.sh
                               meta_os_info
                               meta_resource_id
                             
+--throughput_keepalive      If set, throughput tests will use http keep alive,
+                            meaning http connections will be re-used for 
+                            multiple requests. When used, throughput_samples 
+                            will be equally spread across throughput_threads 
+                            for each test
+                            
 --throughput_same_continent Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 
                             continent as --test_endpoint. Overrides 
@@ -483,8 +489,10 @@ are informational and used in conjunction with use of save.sh
 --throughput_threads        The number of concurrent threads for throughput 
                             tests. Default is 2
                             
---throughput_time           If set, throughput metrics will be request times 
-                            (ms) instead of rates (Mb/s)
+--throughput_time           If set, throughput metrics will be average request 
+                            times (ms) instead of rates (Mb/s). When used with
+                            throughput_webpage, metrics will be the total page
+                            load time
                             
 --throughput_timeout:       Timeout in seconds for throughput tests. Default is
                             180 seconds unless --throughput_size is 0 or 
@@ -496,6 +504,23 @@ are informational and used in conjunction with use of save.sh
                             --test_endpoint. Default is '/web-probe'. May be 
                             overridden using a URI suffix within 
                             --test_endpoint
+                            
+--throughput_use_mean       If set, mean metrics will be used for reporting and 
+                            calculations instead of the default median
+                            
+--throughput_webpage        May be used to designate contents of a single web 
+                            page. When set, the value should be a space or 
+                            comma separated list of URIs relative to  
+                            test_endpoint (or optionally absolute for an
+                            external endpoint). If set, throughput_same_*,
+                            throughput_size, throughput_small_file and 
+                            throughput_uri will be ignored, 
+                            throughput_keepalive will be implicitly set, and
+                            throughput_samples will designate the number of 
+                            full page loads to perform (each metric 
+                            representing one such load). To accomplish this, 
+                            webpage resources will be evenly divided between
+                            throughput_threads
                             
 --traceroute                Perform a traceroute if a test fails - results of 
                             the traceroutes are written to 

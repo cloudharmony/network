@@ -59,6 +59,7 @@
   {"name": "tests_failed", "type": "smallint unsigned"},
   {"name": "tests_success", "type": "smallint unsigned"},
   {"name": "throughput_https", "type": "boolean"},
+  {"name": "throughput_keepalive", "type": "boolean"},
   {"name": "throughput_size", "type": "float"},
   {"name": "throughput_small_file", "type": "boolean"},
   {"name": "throughput_threads", "type": "tinyint unsigned"},
