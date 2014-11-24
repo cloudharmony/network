@@ -362,6 +362,10 @@ are informational and used in conjunction with saving results (see save.sh)
                             
                             If an endpoint is specified for which there are no
                             supported tests, it will be disregarded
+                            
+* throughput_header         Optional headers to include in http requests - 
+                            multiple OK. For example, to simulate a user agent:
+                            User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3)
 
 * throughput_https          If set, the protocol for throughput tests will 
                             default to https - otherwise it defaults to http

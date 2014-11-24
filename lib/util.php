@@ -5,7 +5,7 @@
  * is not within the $success range
  * @param string  $url the target url
  * @param string $method the http method
- * @param array $headers optional request headers to include in the request
+ * @param array $headers optional request headers to include (hash or array)
  * @param string $file optional file to pipe into the curl process as the 
  * body
  * @param string $auth optional [user]:[pswd] to use for http authentication
@@ -25,7 +25,7 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
   $curl = sprintf('curl -s -X %s%s -w "%s\n" -o %s', $method, $method == 'HEAD' ? ' -I' : '', '%{http_code}', $ofile);
   if ($auth) $curl .= sprintf(' -u "%s"', $auth);
   if (is_array($headers)) {
-    foreach($headers as $header => $val) $curl .= sprintf(' -H "%s:%s"', $header, $val); 
+    foreach($headers as $header => $val) $curl .= sprintf(' -H "%s%s"', is_numeric($header) ? '' : $header . ':', $val); 
   }
   // input file
   if (($method == 'POST' || $method == 'PUT') && file_exists($file)) {
@@ -92,7 +92,7 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
  * @param array $requests array defining the http requests to invoke. Each 
  * element in this array is a hash with the following possible keys:
  *   method:  http method (default is GET)
- *   headers: hash defining http headers to append
+ *   headers: hash or array defining http headers to append
  *   url:     the URL - may be an array to specify multiple (will use keep 
  *            alive)
  *   input:   optional command to pipe into the curl process as the body
@@ -153,7 +153,7 @@ function ch_curl_mt($requests, $timeout=60, $dir='/tmp', $retBody=FALSE, $insecu
     }
     $cmd = (isset($request['input']) ? $request['input'] . ' | curl --data-binary @-' : 'curl') . ($method == 'HEAD' ? ' -I' : '') . ' -s -D - -w "transfer=%{' . ($method == 'GET' ? 'size_download' : 'size_upload') . '}\nspeed=%{' . ($method == 'GET' ? 'speed_download' : 'speed_upload') . '}\ntime=%{time_total}\nurl=%{url_effective}\n" -X ' . $method . ($insecure ? ' --insecure' : '') . (is_numeric($timeout) && $timeout>0 ? ' --max-time ' . $timeout : '');
     $result['request'][$i] = $request['headers'];
-    foreach($request['headers'] as $header => $val) $cmd .= sprintf(' -H "%s: %s"', $header, $val);
+    foreach($request['headers'] as $header => $val) $cmd .= sprintf(' -H "%s%s"', is_numeric($header) ? '' : $header . ':', $val);
     if (isset($request['range'])) $cmd .= ' -r ' . $request['range'];
     $result['urls'][$i] = $request['url'];
     if (!is_array($request['url'])) $request['url'] = array($request['url']);

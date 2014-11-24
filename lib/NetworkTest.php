@@ -343,6 +343,7 @@ class NetworkTest {
           'test_service:',
           'test_service_id:',
           'test_service_type:',
+          'throughput_header:',
           'throughput_https',
           'throughput_inverse',
           'throughput_keepalive',
@@ -366,7 +367,7 @@ class NetworkTest {
           'traceroute',
           'v' => 'verbose'
         );
-        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_webpage'));
+        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_header', 'throughput_webpage'));
         $this->options['run_start'] = time();
         $this->verbose = isset($this->options['verbose']);
         
@@ -549,7 +550,8 @@ class NetworkTest {
    * @return array
    */
   public static function getSerializedOptions($dir) {
-    return unserialize(file_get_contents(sprintf('%s/%s', $dir, self::NETWORK_TEST_OPTIONS_FILE_NAME)));
+    $file = sprintf('%s/%s', $dir, self::NETWORK_TEST_OPTIONS_FILE_NAME);
+    return file_exists($file) ? unserialize(file_get_contents($file)) : NULL;
   }
   
   /**
@@ -1040,6 +1042,9 @@ class NetworkTest {
       $requests = array();
       for($i=0; $i<$threads; $i++) {
         $request = array('method' => $uplink ? 'POST' : 'GET');
+        // add custom request headers
+        if (isset($this->options['throughput_header']) && is_array($this->options['throughput_header']) && $this->options['throughput_header']) $request['headers'] = $this->options['throughput_header'];
+        
         if ($uplink) $request['url'] = $url = sprintf('%s/up.html', $endpoint);
         if (!isset($this->options['throughput_small_file']) && !isset($this->options['throughput_webpage'])) {
           if ($uplink) {
@@ -1073,6 +1078,13 @@ class NetworkTest {
           }
           $resourcesPerThread = round(count($resources)/$threads);
           $resourcesFirstThread = count($resources) - (($threads - 1) * $resourcesPerThread);
+          if (!$resourcesFirstThread) {
+            $resourcesFirstThread = $resourcesPerThread;
+            print_msg(sprintf('Reducing number of threads from %d to %d so requests are evenly distributed', $threads, $threads - 1), $this->verbose, __FILE__, __LINE__);
+            array_pop($requests);
+            $threads--;
+            $this->options['throughput_threads'] = $threads;
+          }
           print_msg(sprintf('Dividing resources [%s] evenly for %d threads [%d resources for first thread; %d resources others]', implode(', ', $resources), $threads, $resourcesFirstThread, $resourcesPerThread), $this->verbose, __FILE__, __LINE__);
           $slicePtr = 0;
           foreach(array_keys($requests) as $n) {
