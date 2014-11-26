@@ -1035,7 +1035,7 @@ class NetworkTest {
     }
     $threads = $this->options['throughput_threads'];
     $timeout = $this->options['throughput_timeout'];
-    $serviceType = isset($this->options['test_service_type']) && array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
+    $serviceType = isset($this->options['test_service_type']) && array_key_exists($idx, $this->options['test_service_type']) ? $this->options['test_service_type'][$idx] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
     $expectedBytes = 0;
     foreach($endpoints as $endpoint) {
       print_msg(sprintf('Attempting %s test using base URI %s; samples: %d; size: %s MB; threads: %d; timeout: %d', $type, $endpoint, $samples, isset($this->options['throughput_small_file']) ? 'rand small file' : (isset($this->options['throughput_webpage']) ? 'full page test' : $sizeMb), $threads, $timeout), $this->verbose, __FILE__, __LINE__);
@@ -1058,7 +1058,7 @@ class NetworkTest {
           }
         }
         $requests[] = $request;
-        print_msg(sprintf('Added curl request [%s] [%s] to test', implode(', ', array_keys($request)), implode(', ', $request)), $this->verbose, __FILE__, __LINE__);
+        print_msg(sprintf('Added curl request [%s] [%s] to test', implode(', ', array_keys($request)), json_encode($request)), $this->verbose, __FILE__, __LINE__);
       }
       for($i=0; $i<$samples; $i++) {
         // full page test
@@ -1145,15 +1145,21 @@ class NetworkTest {
               $bytes = 0;
               $numRequests = count($response['results']);
               $slowestThread = NULL;
-              foreach($response['results'] as $result) {
+              foreach($response['results'] as $n => $result) {
+                $rspeeds = array();
+                $rtimes = array();
+                $rbytes = 0;
                 print_msg(sprintf('Adding curl result %s', implode(', ', array_keys($result))), $this->verbose, __FILE__, __LINE__);
-                foreach(is_array($result['speed']) ? $result['speed'] : array($result['speed']) as $s) $speeds[] = round((($s*8)/1024)/1024, 6);
-                foreach(is_array($result['time']) ? $result['time'] : array($result['time']) as $t) {
-                  $time = $t*1000;
-                  $times[] = $time;
-                  if (!$slowestThread || $time > $slowestThread) $slowestThread = $time;
-                }
-                foreach(is_array($result['transfer']) ? $result['transfer'] : array($result['transfer']) as $b) $bytes += $b;
+                foreach(is_array($result['speed']) ? $result['speed'] : array($result['speed']) as $s) $rspeeds[] = round((($s*8)/1024)/1024, 6);
+                foreach(is_array($result['time']) ? $result['time'] : array($result['time']) as $t) $rtimes[] = $t*1000;
+                foreach(is_array($result['transfer']) ? $result['transfer'] : array($result['transfer']) as $b) $rbytes += $b;
+                print_msg(sprintf('Request %d speeds: [%s]; times: [%s]; bytes: %d', implode(', ', $rspeeds), implode(', ', $rtimes), $rbytes), $this->verbose, __FILE__, __LINE__);
+                
+                $speeds[] = get_mean($rspeeds, 6);
+                $time = array_sum($rtimes);
+                $times[] = $time;
+                if (!$slowestThread || $time > $slowestThread) $slowestThread = $time;
+                $bytes += $rbytes;
               }
               print_msg(sprintf('Got curl results. speed: [%s]; time: [%s]; total transfer: %d', implode(', ', $speeds), implode(', ', $times), $bytes), $this->verbose, __FILE__, __LINE__);
               $mbTransferred = round(($bytes/1024)/1024, 6);
