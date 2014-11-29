@@ -521,6 +521,14 @@ are informational and used in conjunction with saving results (see save.sh)
                             webpage resources will be evenly divided between
                             throughput_threads
                             
+* throughput_webpage_check  If set, the URLs designated by throughput_webpage 
+                            will individually be checked for validity before 
+                            testing begins. If any URL is not valid, that 
+                            index will be removed from all throughput_webpage
+                            parameters. To use this parameter, the number of 
+                            URLs in each throughput_webpage parameter must be 
+                            equal
+                            
 * traceroute                Perform a traceroute if a test fails - results of 
                             the traceroutes are written to traceroute.log in 
                             the --output directory

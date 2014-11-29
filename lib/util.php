@@ -173,31 +173,35 @@ function ch_curl_mt($requests, $timeout=60, $dir='/tmp', $retBody=FALSE, $insecu
       // status code
       if (preg_match('/HTTP[\S]+\s+([0-9]+)\s/', $line, $m)) {
         $status = $m[1]*1;
-        if (isset($result['status'][$i]) && !is_array($result['status'][$i])) $result['status'][$i] = array($result['status'][$i]);
-        if (isset($result['status'][$i]) && is_array($result['status'][$i])) $result['status'][$i][] = $status;
-        else $result['status'][$i] = $status;
-        
-        if ($result['lowest_status'] === 0 || $status < $result['lowest_status']) $result['lowest_status'] = $status;
-        if ($status > $result['highest_status']) $result['highest_status'] = $status;
+        if ($status != 301 && $status != 302) {
+          if (isset($result['status'][$i]) && !is_array($result['status'][$i])) $result['status'][$i] = array($result['status'][$i]);
+          if (isset($result['status'][$i]) && is_array($result['status'][$i])) $result['status'][$i][] = $status;
+          else $result['status'][$i] = $status;
+
+          if ($result['lowest_status'] === 0 || $status < $result['lowest_status']) $result['lowest_status'] = $status;
+          if ($status > $result['highest_status']) $result['highest_status'] = $status; 
+        }
       }
-      // response header
-      else if (preg_match('/^([^:]+):\s+"?([^"]+)"?$/', trim($line), $m)) {
-        $k = trim(strtolower($m[1]));
-        if (isset($result['response'][$i][$k]) && !is_array($result['response'][$i][$k])) $result['response'][$i][$k] = array($result['response'][$i][$k]);
-        if (isset($result['response'][$i][$k]) && is_array($result['response'][$i][$k])) $result['response'][$i][$k][] = $m[2];
-        else $result['response'][$i][$k] = $m[2];
-      }
-      // result value
-      else if (preg_match('/^([^=]+)=(.*)$/', trim($line), $m)) {
-        $k = trim(strtolower($m[1]));
-        if (isset($result['results'][$i][$k]) && !is_array($result['results'][$i][$k])) $result['results'][$i][$k] = array($result['results'][$i][$k]);
-        if (isset($result['results'][$i][$k]) && is_array($result['results'][$i][$k])) $result['results'][$i][$k][] = $m[2];
-        else $result['results'][$i][$k] = $m[2];
-      }
-      // body
-      if (isset($bfiles[$i]) && file_exists($bfiles[$i])) {
-        $result['body'][$i] = file_get_contents($bfiles[$i]);
-        unlink($bfiles[$i]);
+      else if ($status && $status != 301 && $status != 302) {
+        // response header
+        if (preg_match('/^([^:]+):\s+"?([^"]+)"?$/', trim($line), $m)) {
+          $k = trim(strtolower($m[1]));
+          if (isset($result['response'][$i][$k]) && !is_array($result['response'][$i][$k])) $result['response'][$i][$k] = array($result['response'][$i][$k]);
+          if (isset($result['response'][$i][$k]) && is_array($result['response'][$i][$k])) $result['response'][$i][$k][] = $m[2];
+          else $result['response'][$i][$k] = $m[2];
+        }
+        // result value
+        else if (preg_match('/^([^=]+)=(.*)$/', trim($line), $m)) {
+          $k = trim(strtolower($m[1]));
+          if (isset($result['results'][$i][$k]) && !is_array($result['results'][$i][$k])) $result['results'][$i][$k] = array($result['results'][$i][$k]);
+          if (isset($result['results'][$i][$k]) && is_array($result['results'][$i][$k])) $result['results'][$i][$k][] = $m[2];
+          else $result['results'][$i][$k] = $m[2];
+        }
+        // body
+        if (isset($bfiles[$i]) && file_exists($bfiles[$i])) {
+          $result['body'][$i] = file_get_contents($bfiles[$i]);
+          unlink($bfiles[$i]);
+        } 
       }
     }
     unlink($ofiles[$i]);

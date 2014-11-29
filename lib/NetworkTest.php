@@ -364,6 +364,7 @@ class NetworkTest {
           'throughput_uri:',
           'throughput_use_mean',
           'throughput_webpage:',
+          'throughput_webpage_check',
           'traceroute',
           'v' => 'verbose'
         );
@@ -1153,7 +1154,7 @@ class NetworkTest {
                 foreach(is_array($result['speed']) ? $result['speed'] : array($result['speed']) as $s) $rspeeds[] = round((($s*8)/1024)/1024, 6);
                 foreach(is_array($result['time']) ? $result['time'] : array($result['time']) as $t) $rtimes[] = $t*1000;
                 foreach(is_array($result['transfer']) ? $result['transfer'] : array($result['transfer']) as $b) $rbytes += $b;
-                print_msg(sprintf('Request %d speeds: [%s]; times: [%s]; bytes: %d', implode(', ', $rspeeds), implode(', ', $rtimes), $rbytes), $this->verbose, __FILE__, __LINE__);
+                print_msg(sprintf('Request %d speeds: [%s]; times: [%s]; bytes: %d', $n+1, implode(', ', $rspeeds), implode(', ', $rtimes), $rbytes), $this->verbose, __FILE__, __LINE__);
                 
                 $speeds[] = get_mean($rspeeds, 6);
                 $time = array_sum($rtimes);
@@ -1296,6 +1297,49 @@ class NetworkTest {
         if (trim($country) && !isset($countries[$country])) {
           $validated['test_location'] = sprintf('%s is not a valid ISO 3166 country code', $country);
           break;
+        }
+      }
+    }
+    
+    if (isset($this->options['throughput_webpage']) && isset($this->options['throughput_webpage_check'])) {
+      $nurls = NULL;
+      $mismatch = FALSE;
+      foreach($this->options['throughput_webpage'] as $i => $webpages) {
+        if (!isset($nurls)) $nurls = count($webpages);
+        else if (count($webpages) != $nurls) {
+          $mismatch = TRUE;
+          break;
+        }
+      }
+      if ($mismatch) $validated['throughput_webpage_check'] = sprintf('Use of --throughput_webpage_check requires the number of webpages in each --throughput_webpage parameter to be equal. The first such parameter contained %d URLs, while the %d parameter contained %d URLs', $nurls, $i+1, count($webpages));
+      // test each individual URL
+      else {
+        $remove = array();
+        $headers = isset($this->options['throughput_header']) && is_array($this->options['throughput_header']) && $this->options['throughput_header'] ? $this->options['throughput_header'] : NULL;
+        foreach($this->options['test_endpoint'] as $idx => $endpoint) {
+          $webpages = isset($this->options['throughput_webpage'][$idx]) ? $this->options['throughput_webpage'][$idx] : $this->options['throughput_webpage'][0];
+          foreach($webpages as $i => $webpage) {
+            if (!isset($remove[$i])) {
+              $url = preg_match('/^http/', $webpage) ? $webpage : sprintf('%s%s%s', $endpoint[0], substr($webpage, 0, 1) == '/' ? '' : '/', $webpage);
+              if (ch_curl($url, 'HEAD', $headers)) print_msg(sprintf('Successfully validated endpoint %d URL %d %s', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__);
+              else {
+                print_msg(sprintf('Unable to validate endpoint %d URL %d %s - URL will be removed from all endpoints', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__, TRUE);
+                $remove[$i] = TRUE;
+              }
+            }
+          }
+        }
+        foreach($this->options['throughput_webpage'] as $i => $webpages) {
+          foreach($webpages as $n => $webpage) {
+            if (isset($remove[$n])) {
+              print_msg(sprintf('Removing webpage %s from --throughput_webpage %d', $webpage, $i+1), $this->verbose, __FILE__, __LINE__);
+              unset($this->options['throughput_webpage'][$i][$n]);
+            }
+          }
+          if (!count($this->options['throughput_webpage'][$i])) {
+            $validated['throughput_webpage'] = sprintf('throughput_webpage at index %d has not URIs', $i);
+            break;
+          }
         }
       }
     }
