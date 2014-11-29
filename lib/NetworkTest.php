@@ -1322,13 +1322,16 @@ class NetworkTest {
           foreach($webpages as $i => $webpage) {
             if (!isset($remove[$i])) {
               $url = preg_match('/^http/', $webpage) ? $webpage : sprintf('%s%s%s', $endpoint[0], substr($webpage, 0, 1) == '/' ? '' : '/', $webpage);
-              if ($ofile = ch_curl($url, 'GET', $headers, NULL, NULL, '200-299', 2)) {
+              if (file_exists($ofile = ch_curl($url, 'GET', $headers, NULL, NULL, '200-299', 2))) {
                 if (!isset($sizes[$i])) $sizes[$i] = filesize($ofile);
-                else if ($sizes[$i] != filesize($ofile)) {
-                  print_msg(sprintf('Unable to validate endpoint %d URL %d %s because size %d does not match initial request size %d - URL will be removed from all endpoints', $idx+1, $i+1, $url, filesize($ofile), $sizes[$i]), $this->verbose, __FILE__, __LINE__, TRUE);
-                  $remove[$i] = TRUE;
+                else {
+                  $diff = $sizes[$i]*0.05;
+                  if (abs($sizes[$i] - filesize($ofile)) > $diff) {
+                    print_msg(sprintf('Unable to validate endpoint %d URL %d %s because size %d does not match initial request size %d - URL will be removed from all endpoints', $idx+1, $i+1, $url, filesize($ofile), $sizes[$i]), $this->verbose, __FILE__, __LINE__, TRUE);
+                    $remove[$i] = TRUE;
+                  }
+                  else print_msg(sprintf('Successfully validated endpoint %d URL %d %s', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__); 
                 }
-                else print_msg(sprintf('Successfully validated endpoint %d URL %d %s', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__);
                 exec(sprintf('rm -f %s', $ofile));
               }
               else {

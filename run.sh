@@ -528,9 +528,11 @@ are informational and used in conjunction with use of save.sh
                             
 --throughput_webpage_check  If set, the URLs designated by throughput_webpage 
                             will individually be checked for validity before 
-                            testing begins. If any URL is not valid, that 
-                            index will be removed from all throughput_webpage
-                            parameters. To use this parameter, the number of 
+                            testing begins. To be considered valid, the URL 
+                            should have a 2XX response and be within 5% of the 
+                            same size as the first endpoint. If any URL is not 
+                            valid, that index will be removed for all test 
+                            endpoints. To use this parameter, the number of 
                             URLs in each throughput_webpage parameter must be 
                             equal
                             
