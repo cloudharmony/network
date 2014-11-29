@@ -1314,6 +1314,7 @@ class NetworkTest {
       if ($mismatch) $validated['throughput_webpage_check'] = sprintf('Use of --throughput_webpage_check requires the number of webpages in each --throughput_webpage parameter to be equal. The first such parameter contained %d URLs, while the %d parameter contained %d URLs', $nurls, $i+1, count($webpages));
       // test each individual URL
       else {
+        $sizes = array();
         $remove = array();
         $headers = isset($this->options['throughput_header']) && is_array($this->options['throughput_header']) && $this->options['throughput_header'] ? $this->options['throughput_header'] : NULL;
         foreach($this->options['test_endpoint'] as $idx => $endpoint) {
@@ -1321,7 +1322,15 @@ class NetworkTest {
           foreach($webpages as $i => $webpage) {
             if (!isset($remove[$i])) {
               $url = preg_match('/^http/', $webpage) ? $webpage : sprintf('%s%s%s', $endpoint[0], substr($webpage, 0, 1) == '/' ? '' : '/', $webpage);
-              if (ch_curl($url, 'HEAD', $headers)) print_msg(sprintf('Successfully validated endpoint %d URL %d %s', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__);
+              if ($ofile = ch_curl($url, 'GET', $headers, NULL, NULL, '200-299', 2)) {
+                if (!isset($sizes[$i])) $sizes[$i] = filesize($ofile);
+                else if ($sizes[$i] != filesize($ofile)) {
+                  print_msg(sprintf('Unable to validate endpoint %d URL %d %s because size %d does not match initial request size %d - URL will be removed from all endpoints', $idx+1, $i+1, $url, filesize($ofile), $sizes[$i]), $this->verbose, __FILE__, __LINE__, TRUE);
+                  $remove[$i] = TRUE;
+                }
+                else print_msg(sprintf('Successfully validated endpoint %d URL %d %s', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__);
+                exec(sprintf('rm -f %s', $ofile));
+              }
               else {
                 print_msg(sprintf('Unable to validate endpoint %d URL %d %s - URL will be removed from all endpoints', $idx+1, $i+1, $url), $this->verbose, __FILE__, __LINE__, TRUE);
                 $remove[$i] = TRUE;

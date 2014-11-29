@@ -13,7 +13,8 @@
  * a successful request. defaults to 200 to 299. This parameter may be a comma
  * separated list of values or ranges (e.g. "200,404" or "200-299,404")
  * @param boolean $retBody whether or not to return the response body. If 
- * FALSE (default), the status code is returned
+ * FALSE (default), the status code is returned. If $retBody=2 instead of 
+ * TRUE, the path to a file containing the body is returned
  * @return mixed
  */
 function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $success='200-299', $retBody=FALSE) {
@@ -59,14 +60,14 @@ function ch_curl($url, $method='HEAD', $headers=NULL, $file=NULL, $auth=NULL, $s
     if ($ecode) print_msg(sprintf('curl failed with exit code %d', $ecode), isset($ch_curl_options['verbose']), __FILE__, __LINE__, TRUE);
     else if (in_array($status, $ok)) {
       print_msg(sprintf('curl successful with status code %d', $status), isset($ch_curl_options['verbose']), __FILE__, __LINE__);
-      $response = $retBody && file_exists($ofile) ? file_get_contents($ofile) : $status;
+      $response = $retBody && file_exists($ofile) ? ($retBody === 2 ? $ofile : file_get_contents($ofile)) : $status;
     }
     else {
       $response = FALSE;
       print_msg(sprintf('curl failed because to status code %d in not in allowed range %s', $status, $success), isset($ch_curl_options['verbose']), __FILE__, __LINE__, TRUE);
     }
   }
-  if ($retBody && file_exists($ofile)) unlink($ofile);
+  if ($retBody && $retBody !== 2 && file_exists($ofile)) unlink($ofile);
   
   return $response;
 }
