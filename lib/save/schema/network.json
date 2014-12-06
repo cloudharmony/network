@@ -6,6 +6,7 @@
   {"name": "meta_compute_service", "type": "char(32)"},
   {"name": "meta_compute_service_id", "type": "char(24)"},
   {"name": "meta_cpu", "type": "char(32)"},
+  {"name": "meta_cpu_cores", "type": "tinyint unsigned"},
   {"name": "meta_instance_id", "type": "char(96)"},
   {"name": "meta_geo_region", "type": "char(32)"},
   {"name": "meta_hostname", "type": "char(64)"},
