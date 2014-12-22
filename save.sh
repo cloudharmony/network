@@ -234,7 +234,6 @@ the others are not repeated, they will be applied to all submissions
                             combination of both --db_librato_count and 
                             --db_librato_sum are REQUIRED
                             
-                                                  
 --db_mysql_engine           An optional explicit storage engine to use when 
                             creating MySQL tables (i.e. if a table does not 
                             already exist). If not set, the default storage 
@@ -435,10 +434,10 @@ USAGE
 ./save --db bigquery --db_name benchmark_dataset --store s3 --store_key THISIH5TPISAEZIJFAKE --store_secret thisNoat1VCITCGggisOaJl3pxKmGu2HMKxxfake --store_container benchmarks1234
 
 # save results to Librato Metrics using the median metric and custom name/source
-save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_value metric
+./save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_value metric
 
 # save results to Librato Metrics using count + sum and custom name/source and other attributes
-save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_count samples --db_librato_display_units_short ms --db_librato_max metric_max --db_librato_min metric_min --db_librato_measure_time test_stopped --db_librato_name "{benchmark}-{test}" --db_librato_period 300 --db_librato_source "{meta_geo_region}" --db_librato_sum metric_sum --db_librato_sum_squares metric_sum_squares
+./save.sh --db librato --db_user [user] --db_pswd [API key] -v --db_librato_aggregate --db_librato_count samples --db_librato_display_units_short ms --db_librato_max metric_max --db_librato_min metric_min --db_librato_measure_time test_stopped --db_librato_name "{benchmark}-{test}" --db_librato_period 300 --db_librato_source "{meta_geo_region}" --db_librato_sum metric_sum --db_librato_sum_squares metric_sum_squares
 
 
 EXIT CODES:
