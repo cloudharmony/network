@@ -1,5 +1,6 @@
 [
   {"name": "benchmark_version", "type": "char(8)"},
+  {"name": "collectd_rrd", "type": "char(255)"},
   {"name": "dns_recursive", "type": "boolean"},
   {"name": "dns_servers", "type": "tinyint unsigned"},
   {"name": "iteration", "type": "tinyint unsigned"},

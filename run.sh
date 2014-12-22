@@ -28,6 +28,18 @@ TESTING PARAMETERS
 The following test parameters are supported. Parameters with a 'meta_' prefix 
 are informational and used in conjunction with use of save.sh
 
+--collectd_rrd              If set, collectd rrd stats will be captured from 
+                            --collectd_rrd_dir. To do so, when testing starts,
+                            existing directories in --collectd_rrd_dir will 
+                            be renamed to .bak, and upon test completion 
+                            any directories not ending in .bak will be zipped
+                            and saved along with other test artifacts (as 
+                            collectd-rrd.zip). User MUST have sudo privileges
+                            to use this option
+                            
+--collectd_rrd_dir          Location where collectd rrd files are stored - 
+                            default is /var/lib/collectd/rrd
+
 --abort_threshold           Number of failures to permit before aborting 
                             testing. If set and this number of failures is 
                             reached, testing will stop and no result metrics 
@@ -79,9 +91,9 @@ are informational and used in conjunction with use of save.sh
                             including associated countries/states. Default for 
                             this parameter is:
                             
-                            us_east us_west us_central eu_west eu_central 
-                            eu_east oceania asia_apac asia america_north 
-                            america_central america_south africa
+                            us_west us_central us_east canada 
+                            eu_west eu_central eu_east 
+                            oceania asia america_south africa
                             
                             Geo region associations are based on first match.
                             For example, based on the default value above, 
@@ -150,6 +162,12 @@ are informational and used in conjunction with use of save.sh
 --meta_test_id              Optional unique identifier for a sequential of 
                             tests (e.g. aws-0914)
                             
+--min_runtime               May define an optional minimum runtime. If testing
+                            completes before this time is reached, the process
+                            will sleep for the remaining duration
+                            
+--min_runtime_in_save       If set, --min_runtime will be applied by save.sh
+                            
 --output                    The output directory for writing test artifacts. If 
                             not specified, the current working directory will
                             be used
@@ -176,6 +194,13 @@ are informational and used in conjunction with use of save.sh
                             
 --randomize                 If set, the order of testing will be randomized 
                             (if multiple tests are defined)
+                            
+--sleep_before_start        an optional numeric value or range defining a 
+                            sleep period (seconds) to apply before starting 
+                            testing. If a single numeric value, that exact 
+                            period will be applied. If a range of values 
+                            (e.g. 30-90), then a random sleep period will be 
+                            applied within that range
                             
 --same_continent_only:      If set, only --test_endpoint hosts located in the 
                             same continent will be tested (others are skipped)
@@ -206,7 +231,7 @@ are informational and used in conjunction with use of save.sh
                             same country and state will be tested (others are 
                             skipped). Does not apply to CDN or DNS services
                             
---service_lookup            If set, the CloudHarmony Identify Service API 
+--service_lookup            If set, the CloudHarmony 'Identify Service' API 
                             method will be used to attempt to correlate 
                             --test_endpoint hosts to their associated cloud 
                             provider, service, service type, region and 
@@ -385,7 +410,7 @@ are informational and used in conjunction with use of save.sh
                             (e.g. download => uplink or uplink => downlink), 
                             and the following test record attributes will be 
                             substituted:
-
+                            
                               meta_compute_service <=> test_service
                               meta_compute_service_id <=> test_service_id
                               meta_geo_region <=> test_geo_region
@@ -398,17 +423,17 @@ are informational and used in conjunction with use of save.sh
                               meta_provider <=> test_provider
                               meta_provider_id <=> test_provider_id
                               meta_region <=> test_region
-
+                            
                             Additionally, the following attributes will be 
                             set to null:
-
+                              
                               meta_cpu
                               meta_memory
                               meta_memory_gb
                               meta_memory_mb
                               meta_os_info
                               meta_resource_id
-                            
+                              
 --throughput_keepalive      If set, throughput tests will use http keep alive,
                             meaning http connections will be re-used for 
                             multiple requests. When used, throughput_samples 
@@ -465,7 +490,7 @@ are informational and used in conjunction with use of save.sh
                             Default is 5 unless --throughput_small_file is set
                             or --throughput_size is 0, in which case it is 10. 
                             Total number of test samples is 
-                            [throughput_samples] [throughput_threads]
+                            [throughput_samples] --[throughput_threads]
                             
 --throughput_size           Default size for throughput tests in megabytes. 
                             For downlink throughput tests, the test file from 
@@ -485,7 +510,7 @@ are informational and used in conjunction with use of save.sh
                             
 --throughput_small_file     If set, --throughput_size is ignored and throughput 
                             tests are constrained to test files smaller than 
-                            256KB. Each thread of each request will randomly 
+                            128KB. Each thread of each request will randomly 
                             select one such file. When used, the 
                             throughput_size result value will be the average 
                             file size
@@ -537,9 +562,8 @@ are informational and used in conjunction with use of save.sh
                             equal
                             
 --traceroute                Perform a traceroute if a test fails - results of 
-                            the traceroutes are written to 
-                            traceroute-[host]-[test].log in the --output 
-                            directory
+                            the traceroutes are written to traceroute.log in 
+                            the --output directory
                             
 --verbose                   Show verbose output
 
@@ -551,6 +575,7 @@ This benchmark has the following dependencies:
  dig                        Used for DNS testing
  php-cli                    Used for test automation
  ping                       Used for latency testing
+ zip                        Used to archive collectd rrd files
 
 USAGE
 

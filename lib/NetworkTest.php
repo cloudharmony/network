@@ -267,6 +267,7 @@ class NetworkTest {
         // default run argument values
         $sysInfo = get_sys_info();
         $defaults = array(
+          'collectd_rrd_dir' => '/var/lib/collectd/rrd',
           'dns_retry' => 2,
           'dns_samples' => 10,
           'dns_timeout' => 5,
@@ -286,6 +287,8 @@ class NetworkTest {
         );
         $opts = array(
           'abort_threshold:',
+          'collectd_rrd',
+          'collectd_rrd_dir:',
           'discard_fastest:',
           'discard_slowest:',
           'dns_one_server',
@@ -560,6 +563,7 @@ class NetworkTest {
    * @return boolean
    */
   public function test() {
+    $rrdStarted = isset($this->options['collectd_rrd']) ? ch_collectd_rrd_start($this->options['collectd_rrd_dir'], isset($this->options['verbose'])) : FALSE;
     $success = FALSE;
     
     $testsCompleted = 0;
@@ -655,6 +659,7 @@ class NetworkTest {
       
       if (isset($this->options['randomize']) && $this->options['randomize']) shuffle($tests);
       print_msg(sprintf('Starting [%s] testing of endpoint %s [%d of %d]. providerId: %s; serviceId: %s; serviceType: %s', implode(', ', $tests), $endpoints[0], $testNum + 1, count($keys), $providerId, $serviceId, $serviceType), $this->verbose, __FILE__, __LINE__);
+      
       foreach($tests as $test) {
         // check for endpoints/service/providers to skip latency testing for
         if ($test == 'latency' && isset($this->options['latency_skip'])) {
@@ -832,8 +837,10 @@ class NetworkTest {
         else if (isset($this->options['max_tests']) && $testsCompleted >= $this->options['max_tests']) break;
         else if (isset($this->options['abort_threshold']) && $testsFailed >= $this->options['abort_threshold']) break;
       }
+      
     }
     if ($success) {
+      if ($rrdStarted) ch_collectd_rrd_stop($this->options['collectd_rrd_dir'], $this->options['output'], isset($this->options['verbose']));
       $this->endTest();
       if (isset($this->options['min_runtime']) && !isset($this->options['min_runtime_in_save']) && ($testStarted + $this->options['min_runtime']) > time()) {
         $sleep = ($testStarted + $this->options['min_runtime']) - time();
@@ -1356,6 +1363,14 @@ class NetworkTest {
       }
     }
     
+    // validate collectd rrd options
+    if (isset($this->options['collectd_rrd'])) {
+      if (!ch_check_sudo()) $validated['collectd_rrd'] = 'sudo privilege is required to use this option';
+      else if (!is_dir($this->options['collectd_rrd_dir'])) $validated['collectd_rrd_dir'] = sprintf('The directory %s does not exist', $this->options['collectd_rrd_dir']);
+      else if ((shell_exec('ps aux | grep collectd | wc -l')*1 < 2)) $validated['collectd_rrd'] = 'collectd is not running';
+      else if ((shell_exec(sprintf('find %s -maxdepth 1 -type d 2>/dev/null | wc -l', $this->options['collectd_rrd_dir']))*1 < 2)) $validated['collectd_rrd_dir'] = sprintf('The directory %s is empty', $this->options['collectd_rrd_dir']);
+    }
+    
     return $validated;
   }
   
@@ -1373,6 +1388,7 @@ class NetworkTest {
     $dependencies = array();
     if (isset($this->options['geoiplookup'])) $dependencies['geoiplookup'] = 'GeoIP';
     if (isset($this->options['traceroute'])) $dependencies['traceroute'] = 'traceroute';
+    if (isset($this->options['collectd_rrd'])) $dependencies['zip'] = 'zip';
     foreach($this->options['test'] as $tests) {
       if (in_array('latency', $tests)) $dependencies['ping'] = 'ping';
       if (in_array('downlink', $tests) || in_array('uplink', $tests) || in_array('throughput', $tests)) $dependencies['curl'] = 'curl';

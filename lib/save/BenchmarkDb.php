@@ -109,7 +109,7 @@ class BenchmarkDb {
       
       $added = TRUE;
       if (!isset($this->rows[$table])) $this->rows[$table] = array();
-      $this->rows[$table][] = array_merge($this->artifacts, $row);
+      $this->rows[$table][] = array_merge($row, $this->artifacts);
     }
     return $added;
   }

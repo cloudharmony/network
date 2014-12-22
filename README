@@ -10,6 +10,18 @@ TESTING PARAMETERS
 The following test parameters are supported. Parameters with a 'meta_' prefix 
 are informational and used in conjunction with saving results (see save.sh)
 
+* collectd_rrd              If set, collectd rrd stats will be captured from 
+                            --collectd_rrd_dir. To do so, when testing starts,
+                            existing directories in --collectd_rrd_dir will 
+                            be renamed to .bak, and upon test completion 
+                            any directories not ending in .bak will be zipped
+                            and saved along with other test artifacts (as 
+                            collectd-rrd.zip). User MUST have sudo privileges
+                            to use this option
+                            
+* collectd_rrd_dir          Location where collectd rrd files are stored - 
+                            default is /var/lib/collectd/rrd
+
 * abort_threshold           Number of failures to permit before aborting 
                             testing. If set and this number of failures is 
                             reached, testing will stop and no result metrics 
@@ -549,10 +561,13 @@ This benchmark has the following dependencies:
  ping                       Used for latency testing
  traceroute                 If --traceroute is set - used to traceroute failed
                             hosts following failed tests
+  zip                       Used to compress test artifacts
 
 
 TEST ARTIFACTS
 This benchmark generates the following artifacts (written to --output)
+
+collectd-rrd.zip   collectd RRD files (see --collectd_rrd)
 
 traceroute.log => traceroutes for any failed tests
 
@@ -565,12 +580,14 @@ in save/schema/network.json. Columns can be removed using the save.sh --remove
 parameter
 
 benchmark_version: [benchmark version]
+collectd_rrd: [URL to zip file containing collectd rrd files]
 dns_recursive
 dns_servers: [number of unique DNS servers queried]
 iteration: [iteration number (used with incremental result directories)]
 meta_compute_service
 meta_compute_service_id*
 meta_cpu: [CPU model info]
+meta_cpu_cores: [# of CPU cores]
 meta_instance_id*
 meta_geo_region: [geo region of the testing compute instance (derived from meta_location)]
 meta_hostname: [hostname of the testing compute instance]

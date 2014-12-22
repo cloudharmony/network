@@ -283,6 +283,8 @@ the others are not repeated, they will be applied to all submissions
                             otherwise 1 will be assumed unless results are in 
                             numbered sub-directories
                             
+--nostore_rrd               Do not store collectd RRD files
+                            
 --nostore_traceroute        Do not store traceroute logs
 
 --output                    The output directory to use for writing CSV files.

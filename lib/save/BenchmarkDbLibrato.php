@@ -61,7 +61,7 @@ class BenchmarkDbLibrato extends BenchmarkDb {
       $attr = isset($this->options['db_librato_value']) ? 'db_librato_value' : 'db_librato_count';
       foreach($this->options[$attr] as $i => $valueCol) {
         $value = isset($row[$valueCol]) ? $row[$valueCol]*1 : NULL;
-        if (is_numeric($value)) {
+        if (is_numeric($value) && $value > 0) {
           $name = $this->substituteTokens(isset($this->options['db_librato_name']) ? $this->options['db_librato_name'][$i] : $this->getTableName($table), $row);
           $type = isset($this->options['db_librato_type'][$i]) ? $this->options['db_librato_type'][$i] : $this->options['db_librato_type'][0];
           $record = array();
@@ -131,7 +131,7 @@ class BenchmarkDbLibrato extends BenchmarkDb {
           if (!isset($request[$type . 's'])) $request[$type . 's'] = array();
           $request[$type . 's'][] = $record;
         }
-        else print_msg(sprintf('Skipping --%s %s because %s ', $attr, $valueCol, $value === NULL ? 'it is not present in the results' : 'it is not numeric'), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
+        else print_msg(sprintf('Skipping --%s %s because %s ', $attr, $valueCol, $value === NULL ? 'it is not present in the results' : 'it is not numeric or greater than 0'), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
       }
     }
     

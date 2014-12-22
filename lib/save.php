@@ -21,7 +21,7 @@
 require_once(dirname(__FILE__) . '/NetworkTest.php');
 require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
 $status = 1;
-$args = parse_args(array('iteration:', 'nostore_traceroute', 'params_file:', 'recursive_order:', 'recursive_count:', 'v' => 'verbose'), array('params_file'), 'save_');
+$args = parse_args(array('iteration:', 'nostore_rrd', 'nostore_traceroute', 'params_file:', 'recursive_order:', 'recursive_count:', 'v' => 'verbose'), array('params_file'), 'save_');
 $verbose = isset($args['verbose']);
 print_msg(sprintf('Initiating save with arguments [%s]', implode(', ', array_keys($args))), $verbose, __FILE__, __LINE__);
 
@@ -56,11 +56,11 @@ if ($db =& BenchmarkDb::getDb()) {
     $iteration = isset($args['iteration']) && preg_match('/([0-9]+)/', $args['iteration'], $m) ? $m[1]*1 : $i + 1;
     if ($results = $test->getResults()) {
       print_msg(sprintf('Saving results in directory %s for iteration %d', $dir, $iteration), $verbose, __FILE__, __LINE__);
-      foreach(array('nostore_traceroute' => 'traceroute.log') as $arg => $file) {
+      foreach(array('nostore_rrd' => 'collectd-rrd.zip', 'nostore_rrd' => 'collectd-rrd.zip', 'nostore_traceroute' => 'traceroute.log') as $arg => $file) {
         $file = sprintf('%s/%s', $dir, $file);
         if (!isset($args[$arg]) && file_exists($file)) {
           $pieces = explode('_', $arg);
-          $col = $pieces[count($pieces) - 1];
+          $col = $arg == 'nostore_rrd' ? 'collectd_rrd' : $pieces[count($pieces) - 1];
           $saved = $db->saveArtifact($file, $col);
           if ($saved) print_msg(sprintf('Saved %s successfully', basename($file)), $verbose, __FILE__, __LINE__);
           else if ($saved === NULL) print_msg(sprintf('Unable to save %s', basename($file)), $verbose, __FILE__, __LINE__, TRUE);
