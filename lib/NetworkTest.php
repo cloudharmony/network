@@ -17,7 +17,7 @@
 /**
  * Used to manage network testing
  */
-require_once(dirname(__FILE__) . '/util.php');
+require_once(dirname(__FILE__) . '/benchmark/util.php');
 ini_set('memory_limit', '16m');
 date_default_timezone_set('UTC');
 
@@ -231,7 +231,7 @@ class NetworkTest {
    */
   public function getResults() {
     $results = NULL;
-    require_once(sprintf('%s/save/BenchmarkDb.php', dirname(__FILE__)));
+    require_once(sprintf('%s/benchmark/save/BenchmarkDb.php', dirname(__FILE__)));
     if ($db =& BenchmarkDb::getDb()) {
       $this->getRunOptions();
       if ($results = isset($this->options['results']) ? $this->options['results'] : NULL) {

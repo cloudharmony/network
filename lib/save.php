@@ -19,7 +19,7 @@
  * saves results based on the arguments defined in ../run.sh
  */
 require_once(dirname(__FILE__) . '/NetworkTest.php');
-require_once(dirname(__FILE__) . '/save/BenchmarkDb.php');
+require_once(dirname(__FILE__) . '/benchmark/save/BenchmarkDb.php');
 $status = 1;
 $args = parse_args(array('iteration:', 'nostore_rrd', 'nostore_traceroute', 'params_file:', 'recursive_order:', 'recursive_count:', 'v' => 'verbose'), array('params_file'), 'save_');
 $verbose = isset($args['verbose']);
