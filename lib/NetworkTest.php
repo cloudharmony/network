@@ -758,6 +758,8 @@ class NetworkTest {
             }
             $row['metric'] = get_median($row['metrics']);
             $row['metric_10'] = get_percentile($row['metrics'], 10, $lowerBetter);
+            $row['metric_25'] = get_percentile($row['metrics'], 25, $lowerBetter);
+            $row['metric_75'] = get_percentile($row['metrics'], 75, $lowerBetter);
             $row['metric_90'] = get_percentile($row['metrics'], 90, $lowerBetter);
             $row['metric_fastest'] = $row['metrics'][count($row['metrics']) - 1];
             $row['metric_mean'] = get_mean($row['metrics']);

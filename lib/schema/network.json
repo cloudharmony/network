@@ -26,6 +26,8 @@
   {"name": "meta_test_id", "type": "char(64)"},
   {"name": "metric", "type": "float"},
   {"name": "metric_10", "type": "float"},
+  {"name": "metric_25", "type": "float"},
+  {"name": "metric_75", "type": "float"},
   {"name": "metric_90", "type": "float"},
   {"name": "metric_fastest", "type": "float"},
   {"name": "metric_max", "type": "float"},
