@@ -606,6 +606,8 @@ meta_run_id
 meta_test_id*
 metric: [median test metric: ms for latency and DNS, Mb/s or ms for throughput]
 metric_10: [10th (slowest to fastest) percentile metric]
+metric_25: [25th (slowest to fastest) percentile metric]
+metric_75: [75th (slowest to fastest) percentile metric]
 metric_90: [90th (slowest to fastest) percentile metric]
 metric_fastest: [fastest metric - lowest value for dns/latency, highest for others]
 metric_max: [largest metric]
