@@ -773,11 +773,11 @@ class NetworkTest {
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
             $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
             $row['samples'] = count($row['metrics']);
+            $row['metrics'] = implode(',', $row['metrics']);
             $row['status'] = $status;
             print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
             print_msg(sprintf('status: %s; samples: %d; median: %s; mean: %s; 10th: %s; 90th: %s; fastest: %s; slowest: %s; min: %s; max: %s; sum/squares: %s/%s; stdev: %s', $row['status'], $row['samples'], $row['metric'], $row['metric_mean'], $row['metric_10'], $row['metric_90'], $row['metric_fastest'], $row['metric_slowest'], $row['metric_min'], $row['metric_max'], $row['metric_sum'], $row['metric_sum_squares'], $row['metric_stdev']), $this->verbose, __FILE__, __LINE__);
-            print_msg(sprintf('metrics: [%s]', implode(', ', $row['metrics'])), $this->verbose, __FILE__, __LINE__);
-            unset($row['metrics']);
+            print_msg(sprintf('metrics: [%s]', $row['metrics']), $this->verbose, __FILE__, __LINE__);
             $this->results[] = $row;
             
             // add inverse throughput record

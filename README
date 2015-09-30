@@ -57,6 +57,13 @@ are informational and used in conjunction with saving results (see save.sh)
 * dns_timeout:              Timeout in seconds for DNS queries. Default is 5 
                             seconds
                             
+* font_size                 The base font size pt to use in reports and graphs. 
+                            All text will be relative to this size (i.e. 
+                            smaller, larger). Default is 9. Graphs use this 
+                            value + 4 (i.e. default 13). Open Sans is included
+                            with this software. To change this, simply replace
+                            the reports/font.ttf file with your desired font
+                            
 * geoiplookup               Get --test_endpoint locations using a geoiplookup
                             if --test_location is not specified. In order to 
                             use this option, geoiplookup must be installed with 
@@ -149,6 +156,14 @@ are informational and used in conjunction with saving results (see save.sh)
                             will sleep for the remaining duration
                             
 * min_runtime_in_save       If set, --min_runtime will be applied by save.sh
+
+* nopdfreport               Don't generate PDF version of test report - 
+                            report.pdf. (wkhtmltopdf dependency removed if 
+                            specified)
+                            
+* noreport                  Don't generate html or PDF test reports - 
+                            report.zip and report.pdf (gnuplot, wkhtmltopdf and
+                            zip dependencies removed if specified)
                             
 * output                    The output directory for writing test artifacts. If 
                             not specified, the current working directory will
@@ -620,6 +635,7 @@ metric_sum: [summation of individual measurements]
 metric_sum_squares: [summation of squared individual measurements]
 metric_unit: [unit of measure for the metrics - e.g. ms or Mb/s]
 metric_unit_long: [long form unit of measure for the metrics - e.g. milliseconds or megabits per second]
+metrics: [csv string containing all metrics]
 samples: [number of test samples]
 status: [test status - success, partial or failed]
 test: [type of test: dns, latency, uplink or downlink]
