@@ -808,7 +808,7 @@ class NetworkTest {
                 if ($v) $nrow[$attr] = $v;
                 else if (isset($nrow[$attr])) unset($nrow[$attr]);
               }
-              if (!isset($this->myip)) $this->myip = trim(shell_exec(sprintf('curl -q http://app%d.cloudharmony.com/myip 2>/dev/null', rand(1, 2))));
+              if (!isset($this->myip)) $this->myip = trim(shell_exec('curl -q http://app.cloudharmony.com/myip 2>/dev/null'));
               if ($this->myip) $nrow['test_ip'] = $this->myip;
               else if (isset($nrow['test_ip'])) unset($nrow['test_ip']);
               $this->results[] = $nrow;
