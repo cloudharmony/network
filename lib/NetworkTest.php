@@ -1173,7 +1173,7 @@ class NetworkTest {
               }
               print_msg(sprintf('Got curl results. speed: [%s]; time: [%s]; total transfer: %d', implode(', ', $speeds), implode(', ', $times), $bytes), $this->verbose, __FILE__, __LINE__);
               $mbTransferred = round(($bytes/1024)/1024, 6);
-              if (isset($expectedBytes) && !$ping && $bytes < ($expectedBytes*0.85)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
+              if (isset($expectedBytes) && !$ping && $bytes < ($expectedBytes*0.7)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
               else {
                 if (!isset($metrics)) {
                   $metrics = array('metrics' => array(), 'throughput_size' => array(), 'throughput_threads' => $threads);
