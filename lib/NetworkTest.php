@@ -364,6 +364,7 @@ class NetworkTest {
           'throughput_threads:',
           'throughput_time',
           'throughput_timeout:',
+          'throughput_tolerance:',
           'throughput_uri:',
           'throughput_use_mean',
           'throughput_webpage:',
@@ -391,6 +392,9 @@ class NetworkTest {
         if (isset($this->options['throughput_size']) && $this->options['throughput_size'] == 0) $this->options['throughput_time'] = TRUE;
         if (!isset($this->options['throughput_samples'])) $this->options['throughput_samples'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 10 : 5;
         if (!isset($this->options['throughput_timeout'])) $this->options['throughput_timeout'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 5 : 180;
+        
+        // throughput tolerance
+        if (!isset($this->options['throughput_tolerance']) || !is_numeric($this->options['throughput_tolerance']) || $this->options['throughput_tolerance'] < 0 || $this->options['throughput_tolerance'] > 1) $this->options['throughput_tolerance'] = 0.6;
         
         // expand geo_regions
         if (isset($this->options['geo_regions'])) {
@@ -1173,7 +1177,7 @@ class NetworkTest {
               }
               print_msg(sprintf('Got curl results. speed: [%s]; time: [%s]; total transfer: %d', implode(', ', $speeds), implode(', ', $times), $bytes), $this->verbose, __FILE__, __LINE__);
               $mbTransferred = round(($bytes/1024)/1024, 6);
-              if (isset($expectedBytes) && !$ping && $bytes < ($expectedBytes*0.7)) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
+              if (isset($expectedBytes) && !$ping && $bytes < ($expectedBytes*$this->options['throughput_tolerance'])) print_msg(sprintf('Megabytes transfered %s does not match expected %s', $mbTransferred, round(($expectedBytes/1024)/1024, 6)), $this->verbose, __FILE__, __LINE__, TRUE);
               else {
                 if (!isset($metrics)) {
                   $metrics = array('metrics' => array(), 'throughput_size' => array(), 'throughput_threads' => $threads);

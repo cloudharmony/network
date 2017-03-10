@@ -523,10 +523,15 @@ are informational and used in conjunction with use of save.sh
                             throughput_webpage, metrics will be the total page
                             load time
                             
---throughput_timeout:       Timeout in seconds for throughput tests. Default is
+--throughput_timeout        Timeout in seconds for throughput tests. Default is
                             180 seconds unless --throughput_size is 0 or 
                             --throughput_small_file is set in which case it is
                             5
+                            
+--throughput_tolerance      The permitted variation between requested and 
+                            transferred bytes for a throughput test. Default 
+                            is 0.6 - meaning transferred bytes must be within
+                            60%
                             
 --throughput_uri            Defines the base URI/location of the http/https 
                             accessible CloudHarmony web-probe directory on 
