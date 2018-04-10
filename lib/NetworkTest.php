@@ -1275,7 +1275,7 @@ class NetworkTest {
       'throughput_same_state' => array('max' => 1024, 'min' => 1),
       'throughput_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'throughput_size' => array('max' => 1024, 'min' => 0, 'required' => TRUE),
-      'throughput_threads' => array('max' => 32, 'min' => 1, 'required' => TRUE),
+      'throughput_threads' => array('max' => 256, 'min' => 1, 'required' => TRUE),
       'throughput_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE)
     );
     $validated = validate_options($this->getRunOptions(), $validate);
