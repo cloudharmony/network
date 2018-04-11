@@ -638,6 +638,7 @@ metric_slowest: [slowest metric - highest value for dns/latency, lowest for othe
 metric_stdev: [sample standard deviation]
 metric_sum: [summation of individual measurements]
 metric_sum_squares: [summation of squared individual measurements]
+metric_timed: [throughput based on time - not curl reported speed - uplink/downlink tests only]
 metric_unit: [unit of measure for the metrics - e.g. ms or Mb/s]
 metric_unit_long: [long form unit of measure for the metrics - e.g. milliseconds or megabits per second]
 metrics: [csv string containing all metrics]

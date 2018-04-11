@@ -686,13 +686,16 @@ class NetworkTest {
         
         // iterate through both private and public endpoint addresses
         $testStart = NULL;
+        $testStartTimestamp = NULL;
         $testStop = NULL;
+        $testStopTimestamp = NULL;
         foreach(array_reverse($endpoints) as $n => $endpoint) {
           if ($test != 'dns' && count($endpoints) > 1 && $n == 0 && !$this->usePrivateNetwork($i)) {
             print_msg(sprintf('Skipping private network endpoint %s because services are not related', $endpoint), $this->verbose, __FILE__, __LINE__);
             continue;
           }
           $testStart = date('Y-m-d H:i:s');
+          $testStartTimestamp = microtime(TRUE);
           switch($test) {
             case 'latency':
               $results['latency'] = $this->testLatency($endpoint);
@@ -708,6 +711,7 @@ class NetworkTest {
               break;
           }
           $testStop = date('Y-m-d H:i:s');
+          $testStopTimestamp = microtime(TRUE);
           // check if test completed
           $done = $test == 'dns' ? TRUE : FALSE;
           foreach(array_keys($results) as $key) {
@@ -774,13 +778,18 @@ class NetworkTest {
             $row['metric_rstdev'] = round(($row['metric_stdev']/$row['metric'])*100, 4);
             $row['metric_sum'] = array_sum($row['metrics']);
             $row['metric_sum_squares'] = get_sum_squares($row['metrics']);
+            // calculate throughput based on time - not curl reported speed
+            if (($test == 'downlink' || $test == 'uplink') && isset($metrics['throughput_transfer']) && $metrics['throughput_transfer'] > 0) {
+              $secs = $testStopTimestamp - $testStartTimestamp;
+              $row['metric_timed'] = round(($metrics['throughput_transfer']*8)/$secs, 4);
+            }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
             $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
             $row['samples'] = count($row['metrics']);
             $row['metrics'] = implode(',', $row['metrics']);
             $row['status'] = $status;
             print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
-            print_msg(sprintf('status: %s; samples: %d; median: %s; mean: %s; 10th: %s; 90th: %s; fastest: %s; slowest: %s; min: %s; max: %s; sum/squares: %s/%s; stdev: %s', $row['status'], $row['samples'], $row['metric'], $row['metric_mean'], $row['metric_10'], $row['metric_90'], $row['metric_fastest'], $row['metric_slowest'], $row['metric_min'], $row['metric_max'], $row['metric_sum'], $row['metric_sum_squares'], $row['metric_stdev']), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('status: %s; samples: %d; median: %s; mean: %s; 10th: %s; 90th: %s; fastest: %s; slowest: %s; min: %s; max: %s; timed: %s; sum/squares: %s/%s; stdev: %s', $row['status'], $row['samples'], $row['metric'], $row['metric_mean'], $row['metric_10'], $row['metric_90'], $row['metric_fastest'], $row['metric_slowest'], $row['metric_min'], $row['metric_max'], $row['metric_timed'], $row['metric_sum'], $row['metric_sum_squares'], $row['metric_stdev']), $this->verbose, __FILE__, __LINE__);
             print_msg(sprintf('metrics: [%s]', $row['metrics']), $this->verbose, __FILE__, __LINE__);
             $this->results[] = $row;
             
