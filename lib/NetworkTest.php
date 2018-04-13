@@ -781,7 +781,12 @@ class NetworkTest {
             // calculate throughput based on time - not curl reported speed
             if (($test == 'downlink' || $test == 'uplink') && isset($metrics['throughput_transfer']) && $metrics['throughput_transfer'] > 0) {
               $secs = $testStopTimestamp - $testStartTimestamp;
-              if ($this->options['spacing']) $secs = $secs - (((count($row['metrics']) - 1) * $this->options['spacing'])/1000);
+              print_msg(sprintf('Calculating metric_timed using duration of %s secs and transfer of %s MB', $secs, $metrics['throughput_transfer']), $this->verbose, __FILE__, __LINE__);
+              if ($this->options['spacing']) {
+                $sub = ((count($row['metrics']) - 1) * $this->options['spacing'])/1000;
+                print_msg(sprintf('Subtracting %s secs due to spacing - new duration is %s secs', $sub, $secs - $sub), $this->verbose, __FILE__, __LINE__);
+                $secs -= $sub;
+              }
               $row['metric_timed'] = round(($metrics['throughput_transfer']*8)/$secs, 4);
             }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
