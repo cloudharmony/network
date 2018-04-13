@@ -192,13 +192,6 @@ are informational and used in conjunction with saving results (see save.sh)
 * randomize                 If set, the order of testing will be randomized 
                             (if multiple tests are defined)
                             
-* sleep_before_start        an optional numeric value or range defining a 
-                            sleep period (seconds) to apply before starting 
-                            testing. If a single numeric value, that exact 
-                            period will be applied. If a range of values 
-                            (e.g. 30-90), then a random sleep period will be 
-                            applied within that range
-                            
 * same_continent_only:      If set, only --test_endpoint hosts located in the 
                             same continent will be tested (others are skipped)
                             Does not apply to CDN or DNS services
@@ -235,6 +228,13 @@ are informational and used in conjunction with saving results (see save.sh)
                             location. For more information, see:
                             https://cloudharmony.com/docs/api#!/api/GET_Identify_Service
                             NOTE: if used, response will be cached in /tmp
+                            
+* sleep_before_start        an optional numeric value or range defining a 
+                            sleep period (seconds) to apply before starting 
+                            testing. If a single numeric value, that exact 
+                            period will be applied. If a range of values 
+                            (e.g. 30-90), then a random sleep period will be 
+                            applied within that range
                             
 * spacing                   Spacing in milliseconds to apply between each 
                             test (default is 200 ms => 1/5 second)
