@@ -1169,6 +1169,7 @@ class NetworkTest {
               $bytes = 0;
               $numRequests = count($response['results']);
               $slowestThread = 0;
+              $fastestThread = NULL;
               foreach($response['results'] as $n => $result) {
                 $rspeeds = array();
                 $rtimes = array();
@@ -1183,6 +1184,7 @@ class NetworkTest {
                 $time = array_sum($rtimes);
                 $times[] = $time;
                 if ($time > $slowestThread) $slowestThread = $time;
+                if (!isset($fastestThread) || $time < $fastestThread) $fastestThread = $time;
                 $bytes += $rbytes;
               }
               print_msg(sprintf('Got curl results. speed: [%s]; time: [%s]; total transfer: %d', implode(', ', $speeds), implode(', ', $times), $bytes), $this->verbose, __FILE__, __LINE__);
@@ -1204,7 +1206,7 @@ class NetworkTest {
                 $metrics['metrics'][] = isset($this->options['throughput_time']) ? (isset($this->options['throughput_webpage']) ? $totalTime : (isset($this->options['throughput_use_mean']) ? $meanTime : $medianTime)) : $totalMbs;
                 $metrics['throughput_size'][] = round((($bytes/1024)/1024)/$numRequests, 6);
                 if (!$ping) $metrics['throughput_transfer'] += $mbTransferred;
-                print_msg(sprintf('Test sample %d of %d for URL %s successful. Mean/median rate is [%s %s] Mb/s. Mean/median time is [%s %s] ms. Total rate is %s Mb/s. Total time is %s secs. Slowest thread was %s secs. %s MB transfer on %d reqs', $i+1, $samples, $url, $meanMbs, $medianMbs, $meanTime, $medianTime, round($totalMbs, 4), round($totalTime/1000, 4), round($slowestThread/1000, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
+                print_msg(sprintf('Test sample %d of %d for URL %s successful. Mean/median rate is [%s %s] Mb/s. Mean/median time is [%s %s] ms. Total rate is %s Mb/s. Total time is %s secs. Slowest thread was %s secs. Fastest thread was %s secs. %s MB transfer on %d reqs', $i+1, $samples, $url, $meanMbs, $medianMbs, $meanTime, $medianTime, round($totalMbs, 4), round($totalTime/1000, 4), round($slowestThread/1000, 4), round($fastestThread/1000, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
               }
             }
             else print_msg(sprintf('curl request(s) failed for URL %s because highest status %d is not 2XX', $url, $response['highest_status']), $this->verbose, __FILE__, __LINE__, TRUE);
