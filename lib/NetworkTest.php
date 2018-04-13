@@ -781,7 +781,7 @@ class NetworkTest {
             // calculate throughput based on time - not curl reported speed
             if (($test == 'downlink' || $test == 'uplink') && isset($metrics['throughput_transfer']) && $metrics['throughput_transfer'] > 0) {
               $secs = $testStopTimestamp - $testStartTimestamp;
-              if ($this->options['spacing']) $secs -= ((count($row['metrics']) - 1) * $this->options['spacing'])/1000;
+              if ($this->options['spacing']) $secs = $secs - (((count($row['metrics']) - 1) * $this->options['spacing'])/1000);
               $row['metric_timed'] = round(($metrics['throughput_transfer']*8)/$secs, 4);
             }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
