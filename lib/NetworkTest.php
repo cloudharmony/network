@@ -755,6 +755,7 @@ class NetworkTest {
             else if (isset($row['tests_success']) && $row['tests_success'] > 0) $status = 'success';
             
             // calculate metric statistical values
+            $row['samples'] = count($row['metrics']);
             $lowerBetter = $test == 'latency' || $test == 'dns' || isset($this->options['throughput_time']);
             $lowerBetter ? rsort($row['metrics']) : sort($row['metrics']);
             $discardSlowest = isset($this->options['discard_slowest']) ? $this->options['discard_slowest'] : 0;
@@ -782,8 +783,8 @@ class NetworkTest {
             if (($test == 'downlink' || $test == 'uplink') && isset($metrics['throughput_transfer']) && $metrics['throughput_transfer'] > 0) {
               $secs = $testStopTimestamp - $testStartTimestamp;
               print_msg(sprintf('Calculating metric_timed using duration of %s secs and transfer of %s MB', $secs, $metrics['throughput_transfer']), $this->verbose, __FILE__, __LINE__);
-              if ($this->options['spacing']) {
-                $sub = ((count($row['metrics']) - 1) * $this->options['spacing'])/1000;
+              if ($this->options['spacing'] && $row['samples'] > 1) {
+                $sub = (($row['samples'] - 1) * $this->options['spacing'])/1000;
                 print_msg(sprintf('Subtracting %s secs due to spacing - new duration is %s secs', $sub, $secs - $sub), $this->verbose, __FILE__, __LINE__);
                 $secs -= $sub;
               }
@@ -791,7 +792,6 @@ class NetworkTest {
             }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
             $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
-            $row['samples'] = count($row['metrics']);
             $row['metrics'] = implode(',', $row['metrics']);
             $row['status'] = $status;
             print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
