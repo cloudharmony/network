@@ -1206,7 +1206,7 @@ class NetworkTest {
                 $medianMbs = get_median($speeds, 6);
                 $meanTime = get_mean($times, 6);
                 $medianTime = get_median($times, 6);
-                $totalMbs = isset($this->options['throughput_slowest_thread']) ? ($mbTransferred*8)/($slowestThread/1000) : (isset($this->options['throughput_use_mean']) ? $meanMbs : $medianMbs)*$numRequests;
+                $totalMbs = isset($this->options['throughput_slowest_thread']) ? round(($mbTransferred*8)/($slowestThread/1000), 2) : (isset($this->options['throughput_use_mean']) ? $meanMbs : $medianMbs)*$numRequests;
                 $totalTime = (isset($this->options['throughput_use_mean']) ? $meanTime : $medianTime)*$numRequests;
                 $metrics['metrics'][] = isset($this->options['throughput_time']) ? (isset($this->options['throughput_webpage']) ? $totalTime : (isset($this->options['throughput_use_mean']) ? $meanTime : $medianTime)) : $totalMbs;
                 $metrics['throughput_size'][] = round((($bytes/1024)/1024)/$numRequests, 6);
