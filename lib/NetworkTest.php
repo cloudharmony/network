@@ -757,6 +757,7 @@ class NetworkTest {
             // calculate metric statistical values
             $row['samples'] = count($row['metrics']);
             $lowerBetter = $test == 'latency' || $test == 'dns' || isset($this->options['throughput_time']);
+            $orderedMetrics = implode(',', $row['metrics']);
             $lowerBetter ? rsort($row['metrics']) : sort($row['metrics']);
             $discardSlowest = isset($this->options['discard_slowest']) ? $this->options['discard_slowest'] : 0;
             $discardFastest = isset($this->options['discard_fastest']) ? $this->options['discard_fastest'] : 0;
@@ -792,7 +793,7 @@ class NetworkTest {
             }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
             $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
-            $row['metrics'] = implode(',', $row['metrics']);
+            $row['metrics'] = $orderedMetrics;
             $row['status'] = $status;
             print_msg(sprintf('%s test for endpoint %s completed successfully', $test, $endpoint), $this->verbose, __FILE__, __LINE__);
             print_msg(sprintf('status: %s; samples: %d; median: %s; mean: %s; 10th: %s; 90th: %s; fastest: %s; slowest: %s; min: %s; max: %s; timed: %s; sum/squares: %s/%s; stdev: %s', $row['status'], $row['samples'], $row['metric'], $row['metric_mean'], $row['metric_10'], $row['metric_90'], $row['metric_fastest'], $row['metric_slowest'], $row['metric_min'], $row['metric_max'], $row['metric_timed'], $row['metric_sum'], $row['metric_sum_squares'], $row['metric_stdev']), $this->verbose, __FILE__, __LINE__);
