@@ -24,6 +24,11 @@ date_default_timezone_set('UTC');
 class NetworkTest {
   
   /**
+   * Regex for the conditional_spacing runtime argument
+   */
+  const CONDITIONAL_SPACING_REGEX = '/^([><])([0-9]+)=([0-9]+)$/';
+  
+  /**
    * name of the file where serializes options should be written to for given 
    * test iteration
    */
@@ -289,6 +294,7 @@ class NetworkTest {
           'abort_threshold:',
           'collectd_rrd',
           'collectd_rrd_dir:',
+          'conditional_spacing:',
           'discard_fastest:',
           'discard_slowest:',
           'dns_one_server',
@@ -944,9 +950,12 @@ class NetworkTest {
               $metrics[] = $metric;
               if (count($metrics) >= $samples) break;
               // spacing
-              if (count($metrics) > 1 && isset($this->options['spacing'])) {
-                usleep($this->options['spacing']*1000);
-                print_msg(sprintf('Applied DNS test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+              if (count($metrics) > 1) {
+                if (isset($this->options['spacing'])) {
+                  usleep($this->options['spacing']*1000);
+                  print_msg(sprintf('Applied DNS test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+                }
+                $this->applyConditionalSpacing($metric);
               }
             }
             else $tests_failed++;
@@ -1161,9 +1170,12 @@ class NetworkTest {
         }
         
         // spacing
-        if ($metrics && $i > 1 && isset($this->options['spacing'])) {
-          usleep($this->options['spacing']*1000);
-          print_msg(sprintf('Applied throughput test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+        if ($metrics && $i > 1) {
+          if (isset($this->options['spacing'])) {
+            print_msg(sprintf('Applying throughput test spacing of %d ms', $this->options['spacing']), $this->verbose, __FILE__, __LINE__);
+            usleep($this->options['spacing']*1000);
+          }
+          $this->applyConditionalSpacing($metrics['metrics'][count($metrics['metrics']) - 1]);
         }
         
         if ($response = ch_curl_mt($requests, $timeout, $this->options['output'], FALSE, preg_match('/^https/', $url) ? TRUE : FALSE)) {
@@ -1265,6 +1277,7 @@ class NetworkTest {
         
     $validate = array(
       'abort_threshold' => array('min' => 1),
+      'conditional_spacing' => array('regex' => self::CONDITIONAL_SPACING_REGEX),
       'discard_fastest' => array('max' => 40, 'min' => 0),
       'discard_slowest' => array('max' => 40, 'min' => 0),
       'dns_retry' => array('max' => 10, 'min' => 1, 'required' => TRUE),
@@ -1419,6 +1432,34 @@ class NetworkTest {
       if (in_array('dns', $tests)) $dependencies['dig'] = 'dig';
     }
     return validate_dependencies($dependencies);
+  }
+  
+  /**
+   * applies conditional spacing if applicable. Returns TRUE if spacing was 
+   * applied, FALSE otherwise
+   * @param float $metric the prior test interval result
+   * @return boolean
+   */
+  private function applyConditionalSpacing($metric) {
+    $applied = FALSE;
+    if (is_numeric($metric) && $metric >= 0 && isset($this->options['conditional_spacing']) && preg_match(self::CONDITIONAL_SPACING_REGEX, $this->options['conditional_spacing'], $m)) {
+      $op = $m[1];
+      $threshold = $m[2]*1;
+      $sleep = $m[3]*1;
+      switch($op) {
+        case '<':
+          $applied = $metric < $threshold;
+          break;
+        case '>':
+          $applied = $metric > $threshold;
+          break;
+      }
+      if ($applied) {
+        print_msg(sprintf('Applying sleep interval of %s ms due to conditional_spacing parameter evaluating to true: %s %s %s', $sleep, $metric, $op, $threshold), $this->verbose, __FILE__, __LINE__);
+        usleep($sleep*1000);
+      }
+    }
+    return $applied;
   }
   
   /**

@@ -45,6 +45,18 @@ are informational and used in conjunction with use of save.sh
                             reached, testing will stop and no result metrics 
                             will be generated
                             
+--conditional_spacing       Conditional spacing (milliseconds) to apply before 
+                            a test interval, if the prior interval hits a 
+                            defined threshold. This parameter should match the
+                            regular expression /^[><][0-9]+=[0-9]+$/ where the 
+                            value on the left defines the threshold, and the 
+                            value on the right the spacing. For example, if 
+                            this argument was ">30000=60000" for a throughput 
+                            test, then a 60 second (60000 ms) spacing will be 
+                            applied before a test interval if the prior 
+                            interval results in a throughput value higher than 
+                            30000 Mb/s
+                            
 --discard_fastest           If set, this percentage of the fastest metrics will 
                             be discarded prior to metric calculations (mean, 
                             median, standard deviation)
