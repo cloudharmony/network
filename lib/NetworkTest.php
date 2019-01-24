@@ -1108,6 +1108,7 @@ class NetworkTest {
           $purged = TRUE;
           $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
           $cmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
+          if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
           fwrite($fp, sprintf("%s &>>/dev/null &\n", $cmd));
         }
       }
@@ -1129,12 +1130,11 @@ class NetworkTest {
               $pieces = explode("\n", file_get_contents($ofile));
               $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
               $stop = is_numeric($pieces[1]) && $pieces[1] > $start ? $pieces[1]*1 : NULL;
-              $bytes = $bytes[$n];
-              if ($start && $stop && $bytes) {
+              if ($start && $stop && $bytes[$n]) {
                 $ms = ($stop - $start)/1000000;
                 $secs = round($ms/1000, 8);
                 $response['urls'][] = $request['url'];
-                $r = array('speed' => round($bytes/$secs, 4), 'time' => $secs, 'transfer' => $bytes, 'url' => $commands[$n]);
+                $r = array('speed' => round($bytes[$n]/$secs, 4), 'time' => $secs, 'transfer' => $bytes[$n], 'url' => $commands[$n]);
                 $response['results'][] = $r;
                 $response['status'][] = 200;
                 print_msg(sprintf('Successfully obtained uplink results for request %d: %s', $i, json_encode($r)), $this->verbose, __FILE__, __LINE__);
