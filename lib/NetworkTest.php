@@ -678,6 +678,7 @@ class NetworkTest {
             $supportedTests[] = 'latency';
             break;
           case 'storage':
+            if (isset($this->options['test_cmd_uplink'])) $supportedTests[] = 'uplink';
           case 'cdn':
             $supportedTests[] = 'downlink';
             $supportedTests[] = 'latency';
