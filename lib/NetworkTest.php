@@ -1006,10 +1006,10 @@ class NetworkTest {
     
     // lowest and highest status
     if ($response) {
-      foreach($response['results'] as $r) {
-        if (isset($r['status']) && is_numeric($r['status'])) {
-          if (!isset($response['lowest_status']) || $r['status'] < $response['lowest_status']) $response['lowest_status'] = $r['status'];
-          if (!isset($response['highest_status']) || $r['status'] > $response['highest_status']) $response['highest_status'] = $r['status'];
+      foreach($response['status'] as $status) {
+        if (is_numeric($status)) {
+          if (!isset($response['lowest_status']) || $status < $response['lowest_status']) $response['lowest_status'] = $status;
+          if (!isset($response['highest_status']) || $status > $response['highest_status']) $response['highest_status'] = $status;
         }
       }
     }
