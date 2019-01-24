@@ -1075,13 +1075,15 @@ class NetworkTest {
           $size = is_numeric($source) && $source > 0 ? $source : strlen($source);
           $source = sprintf('%s/uplink_input_%d', $tempDir, $size);
           if (!file_exists($source)) {
-            exec($cmd = sprintf('dd if=/dev/urandom of=%s bs=%d count=1 2>/dev/null', $source, $size));
-            if (file_exists($source) && filesize($source) != $size) unlink($source);
+            exec($cmd = sprintf('dd if=/dev/urandom of=%s bs=%d count=%d 2>/dev/null', $source, $size > 1024 ? 1024 : $size, $size > 1024 ? round($size/1024) : 1));
+            $expectedSize = $size > 1024 ? 1024*round($size/1024) : $size;
+            if (file_exists($source) && filesize($source) != $expectedSize) unlink($source);
             if (file_exists($source)) register_shutdown_function('unlink', $source);
             else $source = NULL;
           }
           if (!$source) {
-            print_msg(sprintf('Unable to generate random %d bytes file for uplink testing in directory %s using command %s', $size, $tempDir, $cmd), $this->verbose, __FILE__, __LINE__, TRUE);
+            print_msg(sprintf('Unable to generate random %d bytes file (expected %d) for uplink testing in directory %s using command %s', 
+                              $size, $expectedSize, $tempDir, $cmd), $this->verbose, __FILE__, __LINE__, TRUE);
             continue;
           }
         }
