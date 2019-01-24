@@ -135,7 +135,8 @@ class NetworkTest {
       }
     }
     print_msg(sprintf('Selected downlink file %s [%s MB] for size %s MB', $dfile, round(($dsize/1024)/1024, 2), round(($size/1024)/1024, 2)), $this->verbose, __FILE__, __LINE__);
-    return $dfile ? array('name' => $dfile, 'size' => $dsize) : NULL;
+    return $dfile ? array('name' => $dfile, 
+                          'size' => isset($this->options['test_files_dir']) ? filesize(sprintf('%s/%s', $this->options['test_files_dir'], $dfile)) : $dsize) : NULL;
   }
   
   /**
@@ -367,6 +368,7 @@ class NetworkTest {
           'test_cmd_uplink_del:',
           'test_cmd_url_strip:',
           'test_endpoint:',
+          'test_files_dir:',
           'test_instance_id:',
           'test_location:',
           'test_private_network_type:',
@@ -984,7 +986,7 @@ class NetworkTest {
                 $r = array('speed' => round($bytes/$secs, 4), 'time' => $secs, 'transfer' => $bytes, 'url' => $commands[$n]);
                 $response['results'][] = $r;
                 $response['status'][] = 200;
-                print_msg(sprintf('Successfully obtained resuults for request %d: %s', $i, json_encode($r)), $this->verbose, __FILE__, __LINE__);
+                print_msg(sprintf('Successfully obtained downlink results for request %d: %s', $i, json_encode($r)), $this->verbose, __FILE__, __LINE__);
               }
               else {
                 print_msg(sprintf('Unable to get required start/stop/bytes from output file: %s', implode(';', $pieces)), $this->verbose, __FILE__, __LINE__, TRUE);
@@ -1038,7 +1040,7 @@ class NetworkTest {
    *   method:  ignored
    *   headers: ignored
    *   url:     the URL to test (http:// or https:// prefixes will be removed)
-   *   input:   optional command to use to generate uplink file
+   *   input:   ignored
    *   body:    optional string or file to use for the uplink file. 
    *            Alternatively, if this is a numeric value, a file will be 
    *            created containing random bytes corresponding with the numeric 
@@ -1047,13 +1049,111 @@ class NetworkTest {
    * @param int $timeout the max allowed time in seconds for each request (i.e. 
    * --max-time). Default is 60. If < 1, no timeout will be set
    */
-  private function testCustomUplink($requests, $timeout=60) {
+  private function testCustomUplink($requests, $timeout=60) {    
     $response = NULL;
     $tempDir = $this->options['output'];
-    // TODO
-    // --test_cmd_uplink "aws s3 cp [source] s3://mybucket/test/[file]"
-    // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/[file]"
-    // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+    if (!is_array($requests)) $requests = array($requests);
+    $cfile = sprintf('%s/%s', $tempDir, self::NETWORK_TEST_CUSTOM_CMDS_FILE_NAME);
+    if ($fp = fopen($cfile, 'w')) {
+      fwrite($fp, "#!/bin/bash\n");
+      $i=1;
+      $urls = array();
+      $commands = array();
+      $tfiles = array();
+      foreach($requests as $n => $request) {
+        $source = isset($request['body']) ? $request['body'] : NULL;
+        if (!$source) {
+          print_msg(sprintf('Uplink request for URL %s does not contain body', $request['url']), $this->verbose, __FILE__, __LINE__, TRUE);
+          continue;
+        }
+        else if (substr($source, 0, 1) == '/' && is_dir(dirname($source)) && !is_readable(dirname($source))) {
+          print_msg(sprintf('Directory %s for file %s for uplink request is not readable', dirname($source), basename($source)), $this->verbose, __FILE__, __LINE__, TRUE);
+          continue;
+        }
+        else if (!is_file($source)) {
+          $size = is_numeric($source) && $source > 0 ? $source : strlen($source);
+          $source = sprintf('%s/uplink_input_%d', $tempDir, $size);
+          if (!file_exists($source)) {
+            exec($cmd = sprintf('dd if=/dev/urandom of=%s bs=%d count=1 2>/dev/null', $source, $size));
+            if (file_exists($source) && filesize($source) != $size) unlink($source);
+            if (file_exists($source)) register_shutdown_function('unlink', $source);
+            else $source = NULL;
+          }
+          if (!$source) {
+            print_msg(sprintf('Unable to generate random %d bytes file for uplink testing in directory %s using command %s', $size, $tempDir, $cmd), $this->verbose, __FILE__, __LINE__, TRUE);
+            continue;
+          }
+        }
+        $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
+        if (!$url) continue;
+        $urls[$n] = $url;
+        $tfiles[$n] = sprintf('%s.%d.%d', basename($source), $i, rand());
+        $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
+        if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
+        $commands[$n] = $cmd;
+        $ofile = sprintf('%s.out%d', $cfile, $i);
+        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 
+                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
+        $i++;
+      }
+      fwrite($fp, "wait\n");
+      // Add purge command(s) for test files created as a result of this test iteration
+      $purged = FALSE;
+      foreach($requests as $n => $request) {
+        if (isset($commands[$n]) && (!$purged || !preg_match('/\*/', $this->options['test_cmd_uplink_del']))) {
+          $purged = TRUE;
+          $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
+          $cmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
+          fwrite($fp, sprintf("%s &>>/dev/null &\n", $cmd));
+        }
+      }
+      fwrite($fp, "wait\n");
+      fclose($fp);
+      exec(sprintf('chmod 755 %s', $cfile));
+      if ($commands) {
+        print_msg(sprintf('Initiating custom uplink command (e.g. %s) %s using %d concurrent requests and script %s', $this->options['test_cmd_uplink'], 
+                                                                                                                      $cmd,
+                                                                                                                      count($commands), 
+                                                                                                                      $cfile), $this->verbose, __FILE__, __LINE__);
+        exec($cfile);
+        print_msg('Custom uplink command execution complete', $this->verbose, __FILE__, __LINE__);
+        $i=1;
+        foreach($requests as $n => $request) {
+          if (isset($commands[$n])) {
+            if (file_exists($ofile = sprintf('%s.out%d', $cfile, $i))) {
+              if (!$response) $response = array('urls' => array(), 'results' => array(), 'status' => array(), 'lowest_status' => NULL, 'highest_status' => NULL);
+              $pieces = explode("\n", file_get_contents($ofile));
+              $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
+              $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
+              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2] : NULL;
+              $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
+              if ($start && $stop && $bytes) {
+                $ms = ($stop - $start)/1000000;
+                $secs = round($ms/1000, 8);
+                $response['urls'][] = $request['url'];
+                $r = array('speed' => round($bytes/$secs, 4), 'time' => $secs, 'transfer' => $bytes, 'url' => $commands[$n]);
+                $response['results'][] = $r;
+                $response['status'][] = 200;
+                print_msg(sprintf('Successfully obtained uplink results for request %d: %s', $i, json_encode($r)), $this->verbose, __FILE__, __LINE__);
+              }
+              else {
+                print_msg(sprintf('Unable to get required start/stop/bytes from output file: %s', implode(';', $pieces)), $this->verbose, __FILE__, __LINE__, TRUE);
+                $response['urls'][] = $request['url'];
+                $response['results'][] = NULL;
+                $response['status'][] = preg_match('/([4-5][0-9]{2})/', $error, $m) ? $m[1]*1 : 500;
+              }
+            }
+            else print_msg(sprintf('Unable to get output from outfile %s', $ofile), $this->verbose, __FILE__, __LINE__, TRUE);
+          }
+          $i++;
+        }
+        exec(sprintf('rm -f %s*', $cfile));
+      }
+      else {
+        print_msg(sprintf('Unable to generate custom command script using %s', $this->options['test_cmd_uplink']), $this->verbose, __FILE__, __LINE__, TRUE);
+      }
+    }
+    else print_msg(sprintf('Unable to open file %s for writing', $cfile), $this->verbose, __FILE__, __LINE__, TRUE);
     
     // lowest and highest status
     if ($response) {
@@ -1274,12 +1374,18 @@ class NetworkTest {
         
         if ($uplink) $request['url'] = $url = sprintf('%s/up.html', $endpoint);
         if (!isset($this->options['throughput_small_file']) && !isset($this->options['throughput_webpage'])) {
+          $file = $this->getDownlinkFile($size, $serviceType);
           if ($uplink) {
-            $request['body'] = $size;
-            $expectedBytes += $size;
+            if (isset($this->options['test_files_dir'])) {
+              $request['body'] = sprintf('%s/%s', $this->options['test_files_dir'], $file['name']);
+              $expectedBytes += $file['size'];
+            }
+            else {
+              $request['body'] = $size;
+              $expectedBytes += $size;
+            }
           }
           else {
-            $file = $this->getDownlinkFile($size, $serviceType);
             $request['url'] = $url = sprintf('%s/%s', $endpoint, $file['name']);
             $expectedBytes += $file['size'];   
           }
@@ -1326,12 +1432,18 @@ class NetworkTest {
           $expectedBytes = 0;
           foreach(array_keys($requests) as $n) {
             $size = rand(1, self::SMALL_FILE_LIMIT);
+            $file = $this->getDownlinkFile($size, $serviceType);
             if ($uplink) {
-              $requests[$n]['body'] = $size;
-              $expectedBytes += $size;
+              if (isset($this->options['test_files_dir'])) {
+                $request[$n]['body'] = sprintf('%s/%s', $this->options['test_files_dir'], $file['name']);
+                $expectedBytes += $file['size'];
+              }
+              else {
+                $requests[$n]['body'] = $size;
+                $expectedBytes += $size;
+              }
             }
             else {
-              $file = $this->getDownlinkFile($size, $serviceType);
               $requests[$n]['url'] = $url = sprintf('%s/%s', $endpoint, $file['name']);
               $expectedBytes += $file['size'];
             }
@@ -1541,6 +1653,36 @@ class NetworkTest {
     }
     if (isset($this->options['throughput_keepalive']) && (isset($this->options['test_cmd_downlink']) || isset($this->options['test_cmd_uplink']))) {
       $validated['throughput_keepalive'] = '--throughput_keepalive cannot be used in conjunction with test_cmd_downlink or test_cmd_uplink';
+    }
+    if (isset($this->options['throughput_webpage']) && (isset($this->options['test_cmd_downlink']) || isset($this->options['test_cmd_uplink']))) {
+      $validated['throughput_webpage'] = '--throughput_webpage cannot be used in conjunction with test_cmd_downlink or test_cmd_uplink';
+    }
+    
+    // validate test_files_dir
+    if (isset($this->options['test_files_dir'])) {
+      if (!is_dir($this->options['test_files_dir'])) {
+        $validated['test_files_dir'] = sprintf('--test_files_dir %s is not a directory', $this->options['test_files_dir']);
+      }
+      else if (!is_readable($this->options['test_files_dir'])) {
+        $validated['test_files_dir'] = sprintf('--test_files_dir %s is not readable', $this->options['test_files_dir']);
+      }
+      else {
+        if (!isset($this->dowlinkFiles)) {
+          $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
+        }
+        foreach($this->dowlinkFiles as $f => $s) {
+          $file = sprintf('%s/%s', $this->options['test_files_dir'], $f);
+          if (!file_exists($file)) {
+            $validated['test_files_dir'] = sprintf('--test_files_dir %s does not contain the file %s', $this->options['test_files_dir'], $f);
+            break;
+          }
+          else if ((abs($s - filesize($file))/$s) > 0.1) {
+            $validated['test_files_dir'] = sprintf('The test file %s in --test_files_dir %s is more than 10% different in size from expected (%d vs %d)', 
+                                                   $f, $this->options['test_files_dir'], filesize($file), $s);
+            break;
+          }
+        }
+      }
     }
     
     // validate test_endpoint association parameters
