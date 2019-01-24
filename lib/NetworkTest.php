@@ -1438,7 +1438,7 @@ class NetworkTest {
             $file = $this->getDownlinkFile($size, $serviceType);
             if ($uplink) {
               if (isset($this->options['test_files_dir'])) {
-                $request[$n]['body'] = sprintf('%s/%s', $this->options['test_files_dir'], $file['name']);
+                $requests[$n]['body'] = sprintf('%s/%s', $this->options['test_files_dir'], $file['name']);
                 $expectedBytes += $file['size'];
               }
               else {
