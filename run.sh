@@ -289,20 +289,26 @@ are informational and used in conjunction with use of save.sh
                             tests. If set, this argument should designate the 
                             structure of a CLI command to use to download 
                             (web-probe) test files. Contents of the requested
-                            file should be written to stdout. On error, this 
-                            command should exit with a non-zero status code. 
-                            This argument must contain the substring [file] 
-                            which will be replaced at runtime with the path to 
-                            the test file to download. This value is 
-                            constructed using a combination of the 
-                            test_endpoint and throughput_uri arguments followed 
-                            by the web-probe repository file name. For example,
-                            the following dowlink command designates use of the 
-                            aws s3 cp cli command, a bucket named 'mybucket' and
-                            web-probe repositories located in that bucket under 
-                            the '/probe' prefix
-
+                            file should be written to stdout or [dest]. If the 
+                            latter, [dest] will be replaced with a random file
+                            name in the 'output' directory and deleted upon 
+                            test completion. On error, this command should exit 
+                            with a non-zero status code. This argument must 
+                            contain the substring [file] which will be replaced 
+                            at runtime with the path to the test file to 
+                            download. This value is constructed using a 
+                            combination of the test_endpoint and throughput_uri 
+                            arguments followed by the web-probe repository file 
+                            name. For example, the following dowlink command 
+                            designates use of the aws s3 cp cli command, a 
+                            bucket named 'mybucket' and web-probe repositories 
+                            located in that bucket under the '/probe' prefix:
+  
+                              Stdout
                               --test_cmd_downlink "aws s3 cp s3://mybucket/probe/[file] -"
+  
+                              [dest]
+                              --test_cmd_downlink "aws s3 cp s3://mybucket/probe/[file] [dest]"
 
 --test_cmd_uplink           Like test_cmd_downlink, but used in place of curl
                             for uplink tests. This command must also contain 

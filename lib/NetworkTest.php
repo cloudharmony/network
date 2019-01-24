@@ -364,6 +364,7 @@ class NetworkTest {
           'suppress_failed',
           'test:',
           'test_cmd_downlink:',
+          'test_cmd_downlink_dir:',
           'test_cmd_uplink:',
           'test_cmd_uplink_del:',
           'test_cmd_url_strip:',
@@ -948,16 +949,23 @@ class NetworkTest {
       $i=1;
       $urls = array();
       $commands = array();
+      $dests = array();
+      $hasDest = preg_match('/\[dest\]/', $this->options['test_cmd_downlink']);
       foreach($requests as $n => $request) {
         $url = trim(str_replace('http://', '', str_replace('https://', '', $request['url'])));
         if (!$url) continue;
         $urls[$n] = $url;
         $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
+        if ($hasDest) {
+          $dest = sprintf('%s/%s.%d.%d', isset($this->options['test_cmd_downlink_dir']) ? $this->options['test_cmd_downlink_dir'] : $tempDir, basename($url), $i, rand());
+          $cmd = str_replace('[dest]', $dest, $cmd);
+          $dests[$n] = $dest;
+        }
         if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
-        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 
-                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
+        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s%s && %s >>%s &\n", 
+                            'date +%s%N', $ofile, $timeout, $cmd, $hasDest ? '' : ' | wc -c >>%s 2>/dev/null', $ofile, $ofile, 'date +%s%N', $ofile));
         $i++;
       }
       fwrite($fp, "wait\n");
@@ -977,7 +985,12 @@ class NetworkTest {
               if (!$response) $response = array('urls' => array(), 'results' => array(), 'status' => array(), 'lowest_status' => NULL, 'highest_status' => NULL);
               $pieces = explode("\n", file_get_contents($ofile));
               $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
-              $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
+              if ($hasDest && file_exists($dests[$n])) {
+                $bytes = filesize($dests[$n]);
+                exec(sprintf('rm -f %s', $dests[$n]));
+              }
+              else if (!$hasDest) $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
+              else $bytes = NULL;
               $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2]*1 : NULL;
               $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
               if ($start && $stop && $bytes) {
@@ -1642,6 +1655,10 @@ class NetworkTest {
     // validate custom uplink/downlink commands
     if (isset($this->options['test_cmd_downlink']) && !preg_match('/\[file\]/', $this->options['test_cmd_downlink'])) {
       $validated['test_cmd_downlink'] = '--test_cmd_downlink must contain the substring [file]';
+    }
+    if (isset($this->options['test_cmd_downlink']) && isset($this->options['test_cmd_downlink_dir']) && 
+        (!is_dir($this->options['test_cmd_downlink_dir']) || !is_writable($this->options['test_cmd_downlink_dir']))) {
+      $validated['test_cmd_downlink_dir'] = sprintf('--test_cmd_downlink_dir %s is not a valid directory or is not writeable', $this->options['test_cmd_downlink_dir']);
     }
     if (isset($this->options['test_cmd_uplink']) && (!preg_match('/\[file\]/', $this->options['test_cmd_uplink']) || 
                                                      !preg_match('/\[source\]/', $this->options['test_cmd_uplink']))) {
