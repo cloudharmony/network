@@ -978,7 +978,7 @@ class NetworkTest {
               $pieces = explode("\n", file_get_contents($ofile));
               $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
               $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
-              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2] : NULL;
+              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2]*1 : NULL;
               $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
               if ($start && $stop && $bytes) {
                 $ms = ($stop - $start)/1000000;
@@ -1032,8 +1032,7 @@ class NetworkTest {
    *             time:               total time for the operation
    *             transfer:           total bytes transferred
    *             url:                actual command used
-   *   status:   200 on success, 500 on failure (or CLI specific HTTP error 
-   *             code if found in stderr)
+   *   status:   200 on success, 500 on failure
    *   lowest_status: the lowest status code
    *   highest_status: the highest status code
    * @param array $requests array defining the http requests to invoke. Each 
@@ -1061,6 +1060,7 @@ class NetworkTest {
       $urls = array();
       $commands = array();
       $tfiles = array();
+      $bytes = array();
       foreach($requests as $n => $request) {
         $source = isset($request['body']) ? $request['body'] : NULL;
         if (!$source) {
@@ -1094,9 +1094,10 @@ class NetworkTest {
         $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
         if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
         $commands[$n] = $cmd;
+        $bytes[$n] = filesize($source);
         $ofile = sprintf('%s.out%d', $cfile, $i);
-        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 
-                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
+        fwrite($fp, sprintf("%s >%s && timeout %d %s &>/dev/null && %s >>%s &\n", 
+                            'date +%s%N', $ofile, $timeout, $cmd, 'date +%s%N', $ofile));
         $i++;
       }
       fwrite($fp, "wait\n");
@@ -1127,9 +1128,8 @@ class NetworkTest {
               if (!$response) $response = array('urls' => array(), 'results' => array(), 'status' => array(), 'lowest_status' => NULL, 'highest_status' => NULL);
               $pieces = explode("\n", file_get_contents($ofile));
               $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
-              $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
-              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2] : NULL;
-              $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
+              $stop = is_numeric($pieces[1]) && $pieces[1] > $start ? $pieces[1]*1 : NULL;
+              $bytes = $bytes[$n];
               if ($start && $stop && $bytes) {
                 $ms = ($stop - $start)/1000000;
                 $secs = round($ms/1000, 8);
@@ -1143,7 +1143,7 @@ class NetworkTest {
                 print_msg(sprintf('Unable to get required start/stop/bytes from output file: %s', implode(';', $pieces)), $this->verbose, __FILE__, __LINE__, TRUE);
                 $response['urls'][] = $request['url'];
                 $response['results'][] = NULL;
-                $response['status'][] = preg_match('/([4-5][0-9]{2})/', $error, $m) ? $m[1]*1 : 500;
+                $response['status'][] = 500;
               }
             }
             else print_msg(sprintf('Unable to get output from outfile %s', $ofile), $this->verbose, __FILE__, __LINE__, TRUE);
