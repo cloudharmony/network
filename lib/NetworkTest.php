@@ -991,7 +991,7 @@ class NetworkTest {
               }
               else if (!$hasDest) $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
               else $bytes = NULL;
-              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2]*1 : NULL;
+              $stop = is_numeric($pieces[$hasDest ? 1 : 2]) && $pieces[$hasDest ? 1 : 2] > $start ? $pieces[$hasDest ? 1 : 2]*1 : NULL;
               $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
               if ($start && $stop && $bytes) {
                 $ms = ($stop - $start)/1000000;
