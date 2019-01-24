@@ -340,6 +340,16 @@ are informational and used in conjunction with use of save.sh
   
                               Wildcard (run once per test iteration):
                               --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+
+--test_cmd_url_strip        Optional string to remove from file URL values 
+                            (i.e. test_endpoint and throughput_uri arguments). 
+                            For example, if testing was setup for Amazon S3 via
+                            curl/HTTP requests (e.g. 
+                            http://mybucket.s3.amazonaws.com/probe) this 
+                            argument could be set to 
+                            --test_cmd_url_strip ".s3.amazonaws.com" (http://
+                            and https:// are automatically removed) to convert 
+                            HTTP URLs to S3 URLs
                             
 --test_endpoint             REQUIRED: hostname or IP address to perform tests 
                             against. For throughput tests this may include an 

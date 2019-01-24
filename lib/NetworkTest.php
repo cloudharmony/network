@@ -406,6 +406,9 @@ class NetworkTest {
         $this->options['run_start'] = time();
         $this->verbose = isset($this->options['verbose']);
         
+        // convert [cpus] substring if specified in --throughput_threads
+        $this->options['throughput_threads'] = $this->evaluateExpression($this->options['throughput_threads']);
+        
         // set default same size constraints if --throughput_size is not set
         if (!isset($this->options['throughput_size'])) {
           foreach(array('throughput_same_continent' => 10, 'throughput_same_country' => 20, 
@@ -1246,7 +1249,7 @@ class NetworkTest {
 
       $size = $ping ? 8 : ($sizeMb*1024)*1024;
     }
-    $threads = $this->evaluateExpression($this->options['throughput_threads']);
+    $threads = $this->options['throughput_threads'];
     $timeout = $this->options['throughput_timeout'];
     $serviceType = isset($this->options['test_service_type']) && array_key_exists($idx, $this->options['test_service_type']) ? $this->options['test_service_type'][$idx] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
     $expectedBytes = 0;
