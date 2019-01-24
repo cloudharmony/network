@@ -64,6 +64,7 @@
   {"name": "test_stopped", "type": "timestamp"},
   {"name": "tests_failed", "type": "smallint unsigned"},
   {"name": "tests_success", "type": "smallint unsigned"},
+  {"name": "throughput_custom_cmd", "type": "boolean"},
   {"name": "throughput_https", "type": "boolean"},
   {"name": "throughput_keepalive", "type": "boolean"},
   {"name": "throughput_size", "type": "float"},

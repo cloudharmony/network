@@ -285,6 +285,62 @@ are informational and used in conjunction with use of save.sh
                             endpoint). Default value for this parameter is 
                             'latency'
                             
+--test_cmd_downlink         May be used to override use of curl for downlink 
+                            tests. If set, this argument should designate the 
+                            structure of a CLI command to use to download 
+                            (web-probe) test files. Contents of the requested
+                            file should be written to stdout. On error, this 
+                            command should exit with a non-zero status code. 
+                            This argument must contain the substring [file] 
+                            which will be replaced at runtime with the path to 
+                            the test file to download. This value is 
+                            constructed using a combination of the 
+                            test_endpoint and throughput_uri arguments followed 
+                            by the web-probe repository file name. For example,
+                            the following dowlink command designates use of the 
+                            aws s3 cp cli command, a bucket named 'mybucket' and
+                            web-probe repositories located in that bucket under 
+                            the '/probe' prefix
+
+                              --test_cmd_downlink "aws s3 cp s3://mybucket/probe/[file] -"
+
+--test_cmd_uplink           Like test_cmd_downlink, but used in place of curl
+                            for uplink tests. This command must also contain 
+                            the substring [file] which will be replaced at 
+                            runtime with a random name to assign to the test 
+                            file. Additionally, this command must also contain
+                            the substring [source] which will be replaced at 
+                            runtime with the path to a local file to be 
+                            uploaded. On error, this command should exit with a
+                            non-zero status code, otherwise it will be 
+                            considered to have been successful. stdout from 
+                            this command is ignored. For example, the following 
+                            uplink command designates use of the aws s3 cp cli 
+                            command, a bucket named 'mybucket' and a name 
+                            prefix of '/test' for uploaded files:
+
+                              --test_cmd_uplink "aws s3 cp [source] s3://mybucket/test/[file]"
+
+--test_cmd_uplink_del       This argument must be used in conjunction with 
+                            test_cmd_uplink designating a command to use to 
+                            remove test files created as a result of uplink 
+                            testing. Like test_cmd_uplink, it may contain the
+                            substring [file] which will be replaced with the
+                            name of each test file uploaded (command will be 
+                            invoked once per file). In place of [file], this 
+                            argument may contain a wildcard '*' character, in 
+                            which case it is assumed this command need only be
+                            invoked once to remove all test files. For example,
+                            the following commands designate removal of files
+                            from the uplink command example above using both 
+                            individual file and wildcard methods:
+  
+                              Individual (run once per file):
+                              --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/[file]"
+  
+                              Wildcard (run once per test iteration):
+                              --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+                            
 --test_endpoint             REQUIRED: hostname or IP address to perform tests 
                             against. For throughput tests this may include an 
                             optional http/https prefix (if set, overrides the 
@@ -450,7 +506,8 @@ are informational and used in conjunction with use of save.sh
                             meaning http connections will be re-used for 
                             multiple requests. When used, throughput_samples 
                             will be equally spread across throughput_threads 
-                            for each test
+                            for each test. Cannot be used in conjunction with 
+                            test_cmd_downlink or test_cmd_uplink
                             
 --throughput_same_continent Throughput test size to use in megabytes if the 
                             compute instance performing tests is in the same 

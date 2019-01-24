@@ -29,6 +29,12 @@ class NetworkTest {
   const CONDITIONAL_SPACING_REGEX = '/^([><])([0-9]+)=([0-9]+)$/';
   
   /**
+   * file name (and prefix for output files) to use when generating a custom
+   * command file
+   */
+  const NETWORK_TEST_CUSTOM_CMDS_FILE_NAME = 'cust-cmds';
+  
+  /**
    * name of the file where serializes options should be written to for given 
    * test iteration
    */
@@ -230,6 +236,20 @@ class NetworkTest {
   }
   
   /**
+   * evaluates a string containing an expression. The substring [cpus] will be 
+   * replaced with the number of CPU cores
+   * @param string $expr the expression to evaluate
+   * @return float
+   */
+  private function evaluateExpression($expr) {
+    $sysInfo = get_sys_info();
+    $expr = str_replace('[cpus]', isset($sysInfo['cpu_cores']) ? $sysInfo['cpu_cores'] : 2, $expr);
+    eval(sprintf('$value=round(%s);', $expr));
+    $value *= 1;
+    return $value;
+  }
+  
+  /**
    * returns test results - an array of hashes each containing the results from
    * 1 test
    * @return array
@@ -342,6 +362,9 @@ class NetworkTest {
           'spacing:',
           'suppress_failed',
           'test:',
+          'test_cmd_downlink:',
+          'test_cmd_uplink:',
+          'test_cmd_uplink_del:',
           'test_endpoint:',
           'test_instance_id:',
           'test_location:',
@@ -796,6 +819,8 @@ class NetworkTest {
                 $secs -= $sub;
               }
               $row['metric_timed'] = round(($metrics['throughput_transfer']*8)/$secs, 4);
+              $row['throughput_custom_cmd'] = ($test == 'downlink' && isset($this->options['test_cmd_downlink'])) || 
+                                              ($test == 'uplink' && isset($this->options['test_cmd_uplink']));
             }
             $row['metric_unit'] = $lowerBetter ? 'ms' : 'Mb/s';
             $row['metric_unit_long'] = $lowerBetter ? 'milliseconds' : 'megabits per second';
@@ -878,6 +903,152 @@ class NetworkTest {
     }
     
     return $success;
+  }
+  
+  /**
+   * Initiates a downlink test iteration using a custom CLI command. Simulates
+   * handling of the same inputs and outputs as the default multi-process curl
+   * method ch_curl_mt. Return value is a hash containing the following keys
+   *   urls:     ordered array of URLs (same order as $requests)
+   *   results:  ordered array of result values - each a hash with the 
+   *             following keys:
+   *             speed:              transfer rate (bytes/sec)
+   *             time:               total time for the operation (secs)
+   *             transfer:           total bytes transferred
+   *             url:                actual command used
+   *   status:   200 on success, 500 on failure (or CLI specific HTTP error 
+   *             code if found in stderr)
+   *   lowest_status: the lowest status code
+   *   highest_status: the highest status code
+   * @param array $requests array defining the http requests to invoke. Each 
+   * element in this array is a hash with the following possible keys:
+   *   method:  ignored
+   *   headers: ignored
+   *   url:     the URL to test (http:// or https:// prefixes will be removed)
+   *   input:   ignored
+   *   body:    ignored
+   *   range:   ignored
+   * @param int $timeout the max allowed time in seconds for each request (i.e. 
+   * --max-time). Default is 60. If < 1, no timeout will be set
+   */
+  private function testCustomDownlink($requests, $timeout=60) {
+    $response = NULL;
+    $tempDir = $this->options['output'];
+    if (!is_array($requests)) $requests = array($requests);
+    $cfile = sprintf('%s/%s', $tempDir, self::NETWORK_TEST_CUSTOM_CMDS_FILE_NAME);
+    if ($fp = fopen($cfile, 'w')) {
+      fwrite($fp, "#!/bin/bash\n");
+      $i=1;
+      $urls = array();
+      $commands = array();
+      foreach($requests as $n => $request) {
+        $url = trim(str_replace('http://', '', str_replace('https://', '', $request['url'])));
+        if (!$url) continue;
+        $urls[$n] = $url;
+        $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
+        $commands[$n] = $cmd;
+        $ofile = sprintf('%s.out%d', $cfile, $i);
+        fwrite($fp, sprintf("%s >%s && %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 'date +%s%N', $ofile, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
+        $i++;
+      }
+      fwrite($fp, "wait\n");
+      fclose($fp);
+      exec(sprintf('chmod 755 %s', $cfile));
+      if ($commands) {
+        print_msg(sprintf('Initiating custom downlink command %s using %d concurrent requests and script %s', $this->options['test_cmd_downlink'], 
+                                                                                                              count($commands), 
+                                                                                                              $cfile), $this->verbose, __FILE__, __LINE__);
+        exec($cfile);
+        print_msg('Custom downlink command execution complete', $this->verbose, __FILE__, __LINE__);
+        $i=1;
+        foreach($requests as $n => $request) {
+          if (isset($commands[$n])) {
+            if (file_exists($ofile = sprintf('%s.out%d', $cfile, $i))) {
+              if (!$response) $response = array('urls' => array(), 'results' => array(), 'status' => array(), 'lowest_status' => NULL, 'highest_status' => NULL);
+              $pieces = explode("\n", file_get_contents($ofile));
+              $start = isset($pieces[0]) && is_numeric($pieces[0]) && $pieces[0] > 0 ? $pieces[0]*1 : NULL;
+              $bytes = is_numeric($pieces[1]) ? $pieces[1] : NULL;
+              $stop = is_numeric($pieces[2]) && $pieces[2] > $start ? $pieces[2] : NULL;
+              $error = is_string($pieces[1]) ? $pieces[1] : (is_string($pieces[2]) ? $pieces[2] : NULL);
+              if ($start && $stop && $bytes) {
+                $ms = ($stop - $start)/1000000;
+                $secs = round($ms/1000, 8);
+                $response['urls'][] = $request['url'];
+                $r = array('speed' => round($bytes/$secs, 4), 'time' => $secs, 'transfer' => $bytes, 'url' => $commands[$n]);
+                $response['results'][] = $r;
+                $response['status'][] = 200;
+                print_msg(sprintf('Successfully obtained resuults for request %d: %s', $i, json_encode($r)), $this->verbose, __FILE__, __LINE__);
+              }
+              else {
+                print_msg(sprintf('Unable to get required start/stop/bytes from output file: %s', implode(';', $pieces)), $this->verbose, __FILE__, __LINE__, TRUE);
+                $response['urls'][] = $request['url'];
+                $response['results'][] = NULL;
+                $response['status'][] = preg_match('/([4-5][0-9]{2})/', $error, $m) ? $m[1]*1 : 500;
+              }
+            }
+            else print_msg(sprintf('Unable to get output from outfile %s', $ofile), $this->verbose, __FILE__, __LINE__, TRUE);
+          }
+          $i++;
+        }
+        exec(sprintf('rm -f %s*', $cfile));
+      }
+      else {
+        print_msg(sprintf('Unable to generate custom command script using %s', $this->options['test_cmd_downlink']), $this->verbose, __FILE__, __LINE__, TRUE);
+      }
+    }
+    else print_msg(sprintf('Unable to open file %s for writing', $cfile), $this->verbose, __FILE__, __LINE__, TRUE);
+    
+    // lowest and highest status
+    if ($response) {
+      foreach($response['results'] as $r) {
+        if (isset($r['status']) && is_numeric($r['status'])) {
+          if (!isset($response['lowest_status']) || $r['status'] < $response['lowest_status']) $response['lowest_status'] = $r['status'];
+          if (!isset($response['highest_status']) || $r['status'] > $response['highest_status']) $response['highest_status'] = $r['status'];
+        }
+      }
+    }
+    
+    return $response;
+  }
+  
+  /**
+   * Initiates a uplink test iteration using a custom CLI command. Simulates
+   * handling of the same inputs and outputs as the default multi-process curl
+   * method ch_curl_mt. Return value is a hash containing the following keys
+   *   urls:     ordered array of URLs (same order as $requests)
+   *   request:  NA
+   *   response: NA
+   *   results:  ordered array of result values - each a hash with the 
+   *             following keys:
+   *             speed:              transfer rate (bytes/sec)
+   *             time:               total time for the operation
+   *             transfer:           total bytes transferred
+   *             url:                actual command used
+   *   status:   200 on success, 500 on failure
+   *   lowest_status: the lowest status code
+   *   highest_status: the highest status code
+   * @param array $requests array defining the http requests to invoke. Each 
+   * element in this array is a hash with the following possible keys:
+   *   method:  ignored
+   *   headers: ignored
+   *   url:     the URL to test (http:// or https:// prefixes will be removed)
+   *   input:   optional command to use to generate uplink file
+   *   body:    optional string or file to use for the uplink file. 
+   *            Alternatively, if this is a numeric value, a file will be 
+   *            created containing random bytes corresponding with the numeric 
+   *            value
+   *   range:   ignored
+   * @param int $timeout the max allowed time in seconds for each request (i.e. 
+   * --max-time). Default is 60. If < 1, no timeout will be set
+   */
+  private function testCustomUplink($requests, $timeout=60) {
+    $response = NULL;
+    $tempDir = $this->options['output'];
+    // TODO
+    // --test_cmd_uplink "aws s3 cp [source] s3://mybucket/test/[file]"
+    // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/[file]"
+    // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+    return $response;
   }
   
   /**
@@ -1072,7 +1243,7 @@ class NetworkTest {
 
       $size = $ping ? 8 : ($sizeMb*1024)*1024;
     }
-    $threads = $this->options['throughput_threads'];
+    $threads = $this->evaluateExpression($this->options['throughput_threads']);
     $timeout = $this->options['throughput_timeout'];
     $serviceType = isset($this->options['test_service_type']) && array_key_exists($idx, $this->options['test_service_type']) ? $this->options['test_service_type'][$idx] : (isset($this->options['test_service_type'][0]) ? $this->options['test_service_type'][0] : NULL);
     $expectedBytes = 0;
@@ -1178,7 +1349,11 @@ class NetworkTest {
           $this->applyConditionalSpacing($metrics['metrics'][count($metrics['metrics']) - 1]);
         }
         
-        if ($response = ch_curl_mt($requests, $timeout, $this->options['output'], FALSE, preg_match('/^https/', $url) ? TRUE : FALSE)) {
+        if ($uplink && isset($this->options['test_cmd_uplink'])) $response = $this->testCustomUplink($requests, $timeout);
+        else if (!$uplink && isset($this->options['test_cmd_downlink'])) $response = $this->testCustomDownlink($requests, $timeout);
+        else $response = ch_curl_mt($requests, $timeout, $this->options['output'], FALSE, preg_match('/^https/', $url) ? TRUE : FALSE);
+        
+        if ($response) {
           if (isset($response['lowest_status']) && isset($response['highest_status']) && isset($response['results']) && count($response['results'])) {
             if ($response['lowest_status'] >= 200 && $response['highest_status'] < 300) {
               print_msg(sprintf('curl request(s) for samples %d of %d completed successfully - highest response status is %d and %d results exist', $i+1, $samples, $response['highest_status'], count($response['results'])), $this->verbose, __FILE__, __LINE__);
@@ -1231,7 +1406,15 @@ class NetworkTest {
           }
           else print_msg(sprintf('curl request(s) did not return highest_status or results for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
         }
-        else print_msg(sprintf('curl request(s) failed for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        else if ($uplink && isset($this->options['test_cmd_uplink'])) {
+          print_msg(sprintf('test_cmd_uplink %s failed for resource %s', $this->options['test_cmd_uplink'], $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
+        else if (!$uplink && isset($this->options['test_cmd_downlink'])) {
+          print_msg(sprintf('test_cmd_downlink %s failed for resource %s', $this->options['test_cmd_downlink'], $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
+        else {
+          print_msg(sprintf('curl request(s) failed for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
+        }
         
         if (!$metrics && (!$response || !isset($response['lowest_status']) || $response['lowest_status'] >= 300)) break;
         if (isset($this->options['throughput_keepalive']) && !isset($this->options['throughput_webpage'])) {
@@ -1306,7 +1489,7 @@ class NetworkTest {
       'throughput_same_state' => array('max' => 1024, 'min' => 1),
       'throughput_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'throughput_size' => array('max' => 1024, 'min' => 0, 'required' => TRUE),
-      'throughput_threads' => array('max' => 256, 'min' => 1, 'required' => TRUE),
+      'throughput_threads' => array('max' => 512, 'min' => 1, 'required' => TRUE),
       'throughput_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE)
     );
     $validated = validate_options($this->getRunOptions(), $validate);
@@ -1322,6 +1505,25 @@ class NetworkTest {
         }
         if (isset($validated['test'])) break;
       }
+    }
+    
+    // validate custom uplink/downlink commands
+    if (isset($this->options['test_cmd_downlink']) && !preg_match('/\[file\]/', $this->options['test_cmd_downlink'])) {
+      $validated['test_cmd_downlink'] = '--test_cmd_downlink must contain the substring [file]';
+    }
+    if (isset($this->options['test_cmd_uplink']) && (!preg_match('/\[file\]/', $this->options['test_cmd_uplink']) || 
+                                                     !preg_match('/\[source\]/', $this->options['test_cmd_uplink']))) {
+      $validated['test_cmd_uplink'] = '--test_cmd_uplink must contain substrings [file] AND [source]';
+    }
+    if (isset($this->options['test_cmd_uplink']) && !isset($this->options['test_cmd_uplink_del'])) {
+      $validated['test_cmd_uplink_del'] = '--test_cmd_uplink_del is required if --test_cmd_uplink has been set';
+    }
+    if (isset($this->options['test_cmd_uplink_del']) && !preg_match('/\[file\]/', $this->options['test_cmd_uplink_del']) && 
+        !preg_match('/\*/', $this->options['test_cmd_uplink_del'])) {
+      $validated['test_cmd_uplink_del'] = '--test_cmd_uplink_del must contain the substring [file] OR a wildcard';
+    }
+    if (isset($this->options['throughput_keepalive']) && (isset($this->options['test_cmd_downlink']) || isset($this->options['test_cmd_uplink']))) {
+      $validated['throughput_keepalive'] = '--throughput_keepalive cannot be used in conjunction with test_cmd_downlink or test_cmd_uplink';
     }
     
     // validate test_endpoint association parameters
