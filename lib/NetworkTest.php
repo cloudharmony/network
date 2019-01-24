@@ -365,6 +365,7 @@ class NetworkTest {
           'test_cmd_downlink:',
           'test_cmd_uplink:',
           'test_cmd_uplink_del:',
+          'test_cmd_url_strip:',
           'test_endpoint:',
           'test_instance_id:',
           'test_location:',
@@ -946,6 +947,7 @@ class NetworkTest {
         if (!$url) continue;
         $urls[$n] = $url;
         $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
+        if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
         fwrite($fp, sprintf("%s >%s && %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 'date +%s%N', $ofile, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
@@ -955,9 +957,10 @@ class NetworkTest {
       fclose($fp);
       exec(sprintf('chmod 755 %s', $cfile));
       if ($commands) {
-        print_msg(sprintf('Initiating custom downlink command %s using %d concurrent requests and script %s', $this->options['test_cmd_downlink'], 
-                                                                                                              count($commands), 
-                                                                                                              $cfile), $this->verbose, __FILE__, __LINE__);
+        print_msg(sprintf('Initiating custom downlink command (e.g. %s) %s using %d concurrent requests and script %s', $this->options['test_cmd_downlink'], 
+                                                                                                                        $cmd,
+                                                                                                                        count($commands), 
+                                                                                                                        $cfile), $this->verbose, __FILE__, __LINE__);
         exec($cfile);
         print_msg('Custom downlink command execution complete', $this->verbose, __FILE__, __LINE__);
         $i=1;
