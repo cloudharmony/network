@@ -953,7 +953,8 @@ class NetworkTest {
         if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
-        fwrite($fp, sprintf("%s >%s && %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 'date +%s%N', $ofile, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
+        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s | wc -c >>%s 2>/dev/null && %s >>%s &\n", 
+                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, $ofile, 'date +%s%N', $ofile));
         $i++;
       }
       fwrite($fp, "wait\n");
@@ -1022,15 +1023,14 @@ class NetworkTest {
    * handling of the same inputs and outputs as the default multi-process curl
    * method ch_curl_mt. Return value is a hash containing the following keys
    *   urls:     ordered array of URLs (same order as $requests)
-   *   request:  NA
-   *   response: NA
    *   results:  ordered array of result values - each a hash with the 
    *             following keys:
    *             speed:              transfer rate (bytes/sec)
    *             time:               total time for the operation
    *             transfer:           total bytes transferred
    *             url:                actual command used
-   *   status:   200 on success, 500 on failure
+   *   status:   200 on success, 500 on failure (or CLI specific HTTP error 
+   *             code if found in stderr)
    *   lowest_status: the lowest status code
    *   highest_status: the highest status code
    * @param array $requests array defining the http requests to invoke. Each 
@@ -1054,6 +1054,17 @@ class NetworkTest {
     // --test_cmd_uplink "aws s3 cp [source] s3://mybucket/test/[file]"
     // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/[file]"
     // --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+    
+    // lowest and highest status
+    if ($response) {
+      foreach($response['status'] as $status) {
+        if (is_numeric($status)) {
+          if (!isset($response['lowest_status']) || $status < $response['lowest_status']) $response['lowest_status'] = $status;
+          if (!isset($response['highest_status']) || $status > $response['highest_status']) $response['highest_status'] = $status;
+        }
+      }
+    }
+    
     return $response;
   }
   
