@@ -434,7 +434,7 @@ class NetworkTest {
         if (isset($this->options['throughput_threads']) && !is_numeric($this->options['throughput_threads'])) {
           $this->options['throughput_threads'] = $this->evaluateExpression($this->options['throughput_threads']);
         }
-        if (!$this->options['throughput_threads']) $this->options['throughput_threads'] = 2;
+        if (!isset($this->options['throughput_threads']) || !$this->options['throughput_threads']) $this->options['throughput_threads'] = 2;
         
         // set default same size constraints if --throughput_size is not set
         if (!isset($this->options['throughput_size'])) {
@@ -480,7 +480,9 @@ class NetworkTest {
             $largest = isset($pieces[1]) ? (is_numeric($pieces[1]) ? $pieces[1] : 
                        (preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[1]) ? (size_from_string($pieces[1])*1024)*1024 : NULL)) : $smallest;
             if (!$largest || $largest < $smallest) $largest = $smallest;
-            for($size=$smallest; $size<=$largest; $size+=1024) {
+            $jump = round(($largest - $smallest)/100);
+            if (!$jump) $jump = 1024;
+            for($size=$smallest; $size<=$largest; $size+=$jump) {
               $f = $this->getDownlinkFile($size, NULL, TRUE);
               $tcpFiles[$f['name']] = TRUE;
             }
