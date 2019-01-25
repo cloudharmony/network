@@ -261,7 +261,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             (bytes assumed if no size suffix designated), or 
                             the keyword 'small' which will select a random 
                             file <=128KB in size for each sample (same effect 
-                            as --tcp_file "0-128KB"). Examples:
+                            as --tcp_file "1-128KB"). Examples:
                             
                               --tcp_file "ping.js"
                               --tcp_file "test10kb.jpg,test20kb.jpg,test30kb.jpg,test40kb.jpg,test50kb.jpg"
