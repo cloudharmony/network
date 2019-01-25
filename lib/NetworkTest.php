@@ -743,9 +743,7 @@ class NetworkTest {
         if (in_array('downlink', $supportedTests)) {
           $supportedTests[] = 'rtt';
           $supportedTests[] = 'ttfb';
-          foreach($endpoints as $endpoint) {
-            if (preg_match('/^https/', $endpoint) || !preg_match('/^http/', $endpoint)) $supportedTests[] = 'ssl';
-          }
+          $supportedTests[] = 'ssl';
         }
         // no tests to run
         $btests = array();
@@ -808,9 +806,7 @@ class NetworkTest {
             case 'rtt':
             case 'ttfb':
             case 'ssl':
-              if ($test != 'ssl' || preg_match('/^https/', $endpoint) || !preg_match('/^http/', $endpoint)) {
-                $results[$test] = $this->testTcp($endpoint, $test);
-              }
+              $results[$test] = $this->testTcp($endpoint, $test);
               break;
           }
           $testStop = date('Y-m-d H:i:s');
@@ -1396,6 +1392,8 @@ class NetworkTest {
     $metrics = NULL;
     // add http(s):// prefix if missing
     if (!preg_match('/^http/', $endpoint)) $endpoint = sprintf('http%s://%s', $test == 'ssl' ? 's' : '', $endpoint);
+    // replace http with https for ssl test
+    if ($test == 'ssl' && !preg_match('/^https/', $endpoint)) $endpoint = str_replace('http://', 'https://', $endpoint);
     // add base URI suffix
     if (!preg_match('/^https?:\/\/.*\//', $endpoint)) $endpoint = sprintf('%s%s%s', $endpoint, substr($this->options['tcp_uri'], 0, 1) != '/' ? '/' : '', $this->options['tcp_uri']);
     // remove trailing /

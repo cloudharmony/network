@@ -324,10 +324,10 @@ are informational and used in conjunction with saving results (see save.sh)
                                          web-probe repository be https 
                                          accessible on --test_endpoint (see 
                                          --tcp_* parameters). If an endpoint 
-                                         is specified without an https prefix,
-                                         it will be assumed to support https. 
-                                         SSH handshake time is calculated using 
-                                         curl timing metrics as: 
+                                         is specified with an http prefix, it
+                                         will be assumed to support https. SSH 
+                                         handshake time is calculated using curl 
+                                         timing metrics as: 
                                          ssl_time = %{time_appconnect} - %{time_connect}
                                          (metric saved is milliseconds)
                                          See https://blog.cloudflare.com/a-question-of-timing/
