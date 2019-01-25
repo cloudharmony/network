@@ -429,6 +429,16 @@ are informational and used in conjunction with use of save.sh
                             service region (if it fails, the public 
                             hostname/IP will be used instead)
                             
+--test_files_dir            May be set to the location of a local directory 
+                            containing the web-probe test files test files
+                            (https://github.com/cloudharmony/web-probe). If 
+                            uplink testing is conducted, these files will be 
+                            used in place of generating random files/bytes for
+                            such tests which will shorten test duration and 
+                            reduce local resource overhead. May specified 
+                            multiple directories separated by a comma if files
+                            might exist in more than one.
+                            
 --test_instance_id          Optional instance type that --test_endpoint 
                             belongs to (e.g. c3.xlarge). If multiple 
                             --test_endpoint parameters are specified, 

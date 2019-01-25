@@ -1819,28 +1819,37 @@ class NetworkTest {
     
     // validate test_files_dir
     if (isset($this->options['test_files_dir'])) {
-      if (!is_dir($this->options['test_files_dir'])) {
-        $validated['test_files_dir'] = sprintf('--test_files_dir %s is not a directory', $this->options['test_files_dir']);
-      }
-      else if (!is_readable($this->options['test_files_dir'])) {
-        $validated['test_files_dir'] = sprintf('--test_files_dir %s is not readable', $this->options['test_files_dir']);
-      }
-      else {
-        if (!isset($this->dowlinkFiles)) {
-          $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
+      // check for first valid directory if multiple specified
+      foreach(explode(',', $this->options['test_files_dir']) as $dir) {
+        if (!($dir = trim($dir))) continue;
+        if (isset($validated['test_files_dir'])) unset($validated['test_files_dir']);
+        if (!is_dir($dir)) {
+          $validated['test_files_dir'] = sprintf('--test_files_dir %s is not a directory', $dir);
         }
-        foreach($this->dowlinkFiles as $f => $s) {
-          $file = sprintf('%s/%s', $this->options['test_files_dir'], $f);
-          if (!file_exists($file)) {
-            $validated['test_files_dir'] = sprintf('--test_files_dir %s does not contain the file %s', $this->options['test_files_dir'], $f);
-            break;
+        else if (!is_readable($dir)) {
+          $validated['test_files_dir'] = sprintf('--test_files_dir %s is not readable', $dir);
+        }
+        else {
+          if (!isset($this->dowlinkFiles)) {
+            $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
           }
-          else if ((abs($s - filesize($file))/$s) > 0.1) {
-            $validated['test_files_dir'] = sprintf('The test file %s in --test_files_dir %s is more than 10% different in size from expected (%d vs %d)', 
-                                                   $f, $this->options['test_files_dir'], filesize($file), $s);
-            break;
+          foreach($this->dowlinkFiles as $f => $s) {
+            $file = sprintf('%s/%s', $dir, $f);
+            if (!file_exists($file)) {
+              $validated['test_files_dir'] = sprintf('--test_files_dir %s does not contain the file %s', $dir, $f);
+              break;
+            }
+            else if ((abs($s - filesize($file))/$s) > 0.1) {
+              $validated['test_files_dir'] = sprintf('The test file %s in --test_files_dir %s is more than 10% different in size from expected (%d vs %d)', 
+                                                     $f, $dir, filesize($file), $s);
+              break;
+            }
           }
         }
+        if (!isset($validated['test_files_dir'])) {
+          $this->options['test_files_dir'] = $dir;
+          break;
+        } 
       }
     }
     

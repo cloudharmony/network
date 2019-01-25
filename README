@@ -476,7 +476,9 @@ are informational and used in conjunction with saving results (see save.sh)
                             uplink testing is conducted, these files will be 
                             used in place of generating random files/bytes for
                             such tests which will shorten test duration and 
-                            reduce local resource overhead.
+                            reduce local resource overhead. May specified 
+                            multiple directories separated by a comma if files
+                            might exist in more than one.
 
 * test_instance_id          Optional instance type that --test_endpoint 
                             belongs to (e.g. c3.xlarge). If multiple 
