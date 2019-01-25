@@ -848,7 +848,7 @@ class NetworkTest {
             if (isset($this->options['test_private_network_type'])) $row['test_private_network_type'] = array_key_exists($i, $this->options['test_private_network_type']) ? $this->options['test_private_network_type'][$i] : $this->options['test_private_network_type'][0];
           }
           $row['timeout'] = $this->options[sprintf('%s_timeout', $test == 'dns' || $test == 'latency' ? $test : 
-                                           ($test == 'downlink' || $test == 'uplink' ? 'throughput' : 'tcp')];
+                                           ($test == 'downlink' || $test == 'uplink' ? 'throughput' : 'tcp'))];
           
           if (isset($metrics) && is_array($metrics)) {
             $testsCompleted++;
