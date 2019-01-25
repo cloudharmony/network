@@ -486,6 +486,7 @@ class NetworkTest {
           else $tcpFiles[$this->options['tcp_file'][$i]] = TRUE;
         }
         $this->options['tcp_file'] = $tcpFiles ? array_keys($tcpFiles) : array('ping.js');
+        print_msg(sprintf('Set tcp_file to %s', implode(', ', $this->options['tcp_file'])), $this->verbose, __FILE__, __LINE__);
         
         // expand tests
         if (!is_array($this->options['test'])) $this->options['test'] = array($this->options['test']);
@@ -1423,7 +1424,7 @@ class NetworkTest {
               $test, $samples, $endpoint, $timeout, $headers ? '; headers=' . implode(';', $headers) : '', $stop, $start, $cmd), $this->verbose, __FILE__, __LINE__);
     
     for($i=1; $i<=$samples; $i++) {
-      $file = $this->options['tcp_uri'][rand(0, count($this->options['tcp_uri']) - 1)];
+      $file = $this->options['tcp_file'][rand(0, count($this->options['tcp_file']) - 1)];
       print_msg(sprintf('Testing using test file %s', $file), $this->verbose, __FILE__, __LINE__);
       $output = trim(shell_exec(str_replace('[file]', $file, $cmd)));
       $pieces = explode('|', $output);
@@ -1432,7 +1433,7 @@ class NetworkTest {
           $metrics = array('metrics' => array(), 'tests_failed' => 0, 'tests_success' => 0);
         }
         $ms = ($pieces[1] - $pieces[0])*1000;
-        $metrics['metrics'] = $ms;
+        $metrics['metrics'][] = $ms;
         $metrics['tests_success']++;
         print_msg(sprintf('Test successful with start time %s, end time %s and metric %s. There are %d successful results.', 
                           $pieces[0], $pieces[1], $ms, $metrics['tests_success']), $this->verbose, __FILE__, __LINE__);
