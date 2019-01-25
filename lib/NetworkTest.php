@@ -498,17 +498,6 @@ class NetworkTest {
         
         // expand tests
         if (!is_array($this->options['test'])) $this->options['test'] = array($this->options['test']);
-        foreach($this->options['test'] as $i => $test) {
-          $tests = array();
-          foreach(explode(',', $test) as $t1) {
-            foreach(explode(' ', $t1) as $t2) {
-              $t2 = strtolower(trim($t2));
-              if ($t2 && !in_array($t2, $tests)) $tests[] = $t2;
-            }
-          }
-          if ($tests) $this->options['test'][$i] = $tests;
-          else unset($this->options['test'][$i]);
-        }
         
         // get parameters from a URL
         if (isset($this->options['params_url'])) {
@@ -1780,14 +1769,11 @@ class NetworkTest {
     
     // validate tests
     if (!isset($validated['test'])) {
-      foreach($this->options['test'] as $tests) {
-        foreach($tests as $test) {
-          if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns', 'rtt', 'ttfb', 'ssl', 'tcp'))) {
-            $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns, rtt, ttfb, ssl, tcp]');
-            break;
-          }
+      foreach($this->options['test'] as $test) {
+        if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns', 'rtt', 'ttfb', 'ssl', 'tcp'))) {
+          $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns, rtt, ttfb, ssl, tcp]');
+          break;
         }
-        if (isset($validated['test'])) break;
       }
     }
     
@@ -1966,12 +1952,10 @@ class NetworkTest {
     if (isset($this->options['geoiplookup'])) $dependencies['geoiplookup'] = 'GeoIP';
     if (isset($this->options['traceroute'])) $dependencies['traceroute'] = 'traceroute';
     if (isset($this->options['collectd_rrd'])) $dependencies['zip'] = 'zip';
-    foreach($this->options['test'] as $tests) {
-      if (in_array('latency', $tests)) $dependencies['ping'] = 'ping';
-      if (in_array('downlink', $tests) || in_array('uplink', $tests) || in_array('throughput', $tests) || 
-          in_array('rtt', $tests) || in_array('ttfb', $tests) || in_array('ssl', $tests) || in_array('tcp', $tests)) $dependencies['curl'] = 'curl';
-      if (in_array('dns', $tests)) $dependencies['dig'] = 'dig';
-    }
+    if (in_array('latency', $this->options['test'])) $dependencies['ping'] = 'ping';
+    if (in_array('downlink', $this->options['test']) || in_array('uplink', $this->options['test']) || in_array('throughput', $this->options['test']) || 
+        in_array('rtt', $this->options['test']) || in_array('ttfb', $this->options['test']) || in_array('ssl', $this->options['test']) || in_array('tcp', $this->options['test'])) $dependencies['curl'] = 'curl';
+    if (in_array('dns', $this->options['test'])) $dependencies['dig'] = 'dig';
     return validate_dependencies($dependencies);
   }
   

@@ -352,12 +352,7 @@ are informational and used in conjunction with saving results (see save.sh)
                                          See https://blog.cloudflare.com/a-question-of-timing/
                               tcp        run all TCP tests - rtt, ssl and ttfb
                             Multiple tests may be specified each separated by a
-                            space or comma. If multiple --test_endpoint 
-                            parameters are specified, --test may be specified 
-                            just once (all test endpoints have the same tests),
-                            or multiple times (different tests for each test 
-                            endpoint). Default value for this parameter is 
-                            'latency'
+                            space or comma. Default test is latency
                             
 * test_cmd_downlink         May be used to override use of curl for downlink 
                             tests. If set, this argument should designate the 
