@@ -92,6 +92,11 @@ class NetworkTest {
   private $results = array();
   
   /**
+   * Files to use for TCP testing (rtt, ttfb, ssl)
+   */
+  private $tcpFiles;
+  
+  /**
    * used to track which traceroutes have been performed
    */
   private $traceroutes = array();
@@ -469,12 +474,11 @@ class NetworkTest {
         }
         
         // expand tcp_file parameter
-        $tcpFiles = array();
-        $this->options['tcp_file'] = explode(',', $this->options['tcp_file']);
-        foreach(array_keys($this->options['tcp_file']) as $i) {
-          $this->options['tcp_file'][$i] = trim($this->options['tcp_file'][$i]);
-          if ($this->options['tcp_file'][$i] == 'small') $this->options['tcp_file'][$i] = '0-128KB';
-          $pieces = explode('-', $this->options['tcp_file'][$i]);
+        $this->tcpFiles = array();
+        foreach(explode(',', $this->options['tcp_file']) as $file) {
+          $file = trim($file);
+          if ($file == 'small') $file = '0-128KB';
+          $pieces = explode('-', $file);
           if (is_numeric($pieces[0]) || preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[0]) && count($pieces) <= 2) {
             $smallest = is_numeric($pieces[0]) ? $pieces[0] : (size_from_string($pieces[0])*1024)*1024;
             $largest = isset($pieces[1]) ? (is_numeric($pieces[1]) ? $pieces[1] : 
@@ -484,13 +488,13 @@ class NetworkTest {
             if (!$jump) $jump = 1024;
             for($size=$smallest; $size<=$largest; $size+=$jump) {
               $f = $this->getDownlinkFile($size, NULL, TRUE);
-              $tcpFiles[$f['name']] = TRUE;
+              $this->tcpFiles[$f['name']] = TRUE;
             }
           }
-          else $tcpFiles[$this->options['tcp_file'][$i]] = TRUE;
+          else $this->tcpFiles[$file] = TRUE;
         }
-        $this->options['tcp_file'] = $tcpFiles ? array_keys($tcpFiles) : array('ping.js');
-        print_msg(sprintf('Set tcp_file to %s', implode(', ', $this->options['tcp_file'])), $this->verbose, __FILE__, __LINE__);
+        $this->tcpFiles = $this->tcpFiles ? array_keys($this->tcpFiles) : array('ping.js');
+        print_msg(sprintf('Set tcp_file to %s', implode(',', $this->tcpFiles)), $this->verbose, __FILE__, __LINE__);
         
         // expand tests
         if (!is_array($this->options['test'])) $this->options['test'] = array($this->options['test']);
@@ -843,7 +847,8 @@ class NetworkTest {
             $row['test_private_endpoint'] = TRUE;
             if (isset($this->options['test_private_network_type'])) $row['test_private_network_type'] = array_key_exists($i, $this->options['test_private_network_type']) ? $this->options['test_private_network_type'][$i] : $this->options['test_private_network_type'][0];
           }
-          $row['timeout'] = $this->options[sprintf('%s_timeout', $test == 'dns' || $test == 'latency' ? $test : 'throughput')];
+          $row['timeout'] = $this->options[sprintf('%s_timeout', $test == 'dns' || $test == 'latency' ? $test : 
+                                           ($test == 'downlink' || $test == 'uplink' ? 'throughput' : 'tcp')];
           
           if (isset($metrics) && is_array($metrics)) {
             $testsCompleted++;
@@ -1426,7 +1431,7 @@ class NetworkTest {
               $test, $samples, $endpoint, $timeout, $headers ? '; headers=' . implode(';', $headers) : '', $stop, $start, $cmd), $this->verbose, __FILE__, __LINE__);
     
     for($i=1; $i<=$samples; $i++) {
-      $file = $this->options['tcp_file'][rand(0, count($this->options['tcp_file']) - 1)];
+      $file = $this->tcpFiles[rand(0, count($this->tcpFiles) - 1)];
       print_msg(sprintf('Testing using test file %s', $file), $this->verbose, __FILE__, __LINE__);
       $output = trim(shell_exec(str_replace('[file]', $file, $cmd)));
       $pieces = explode('|', $output);
@@ -1840,9 +1845,9 @@ class NetworkTest {
     }
     
     // validate tcp_file
-    if (isset($this->options['tcp_file'])) {
+    if ($this->tcpFiles) {
       $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
-      foreach($this->options['tcp_file'] as $file) {
+      foreach($this->tcpFiles as $file) {
         if (!isset($this->dowlinkFiles[$file])) {
           $validated['tcp_file'] = sprintf('--tcp_file %s is not valid', $file);
           break;

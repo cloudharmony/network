@@ -44,6 +44,7 @@
   {"name": "metrics", "type": "char(255)"},
   {"name": "samples", "type": "tinyint unsigned"},
   {"name": "status", "type": "char(8)"},
+  {"name": "tcp_file", "type": "char(64)"},
   {"name": "test", "type": "char(12)"},
   {"name": "test_endpoint", "type": "char(64)"},
   {"name": "test_geo_region", "type": "char(32)"},
