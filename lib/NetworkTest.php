@@ -430,7 +430,10 @@ class NetworkTest {
         $this->verbose = isset($this->options['verbose']);
         
         // convert [cpus] substring if specified in --throughput_threads
-        $this->options['throughput_threads'] = $this->evaluateExpression($this->options['throughput_threads']);
+        if (isset($this->options['throughput_threads']) && !is_numeric($this->options['throughput_threads'])) {
+          $this->options['throughput_threads'] = $this->evaluateExpression($this->options['throughput_threads']);
+        }
+        if (!$this->options['throughput_threads']) $this->options['throughput_threads'] = 2;
         
         // set default same size constraints if --throughput_size is not set
         if (!isset($this->options['throughput_size'])) {
@@ -1771,8 +1774,8 @@ class NetworkTest {
     if (!isset($validated['test'])) {
       foreach($this->options['test'] as $tests) {
         foreach($tests as $test) {
-          if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns', 'rtt', 'ttfb', 'ssl'))) {
-            $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns, rtt, ttfb, ssl]');
+          if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns', 'rtt', 'ttfb', 'ssl', 'tcp'))) {
+            $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns, rtt, ttfb, ssl, tcp]');
             break;
           }
         }
