@@ -1437,7 +1437,7 @@ class NetworkTest {
       $pieces = explode('|', $output);
       if (count($pieces) == 2 && is_numeric($pieces[0]) && is_numeric($pieces[1]) && $pieces[0] >= 0 && $pieces[1] > 0 && $pieces[1] > $pieces[0]) {
         if (!is_array($metrics)) {
-          $metrics = array('metrics' => array(), 'tests_failed' => 0, 'tests_success' => 0);
+          $metrics = array('metrics' => array(), 'tcp_file' => $this->options['tcp_file'], 'tests_failed' => 0, 'tests_success' => 0);
         }
         $ms = ($pieces[1] - $pieces[0])*1000;
         $metrics['metrics'][] = $ms;
