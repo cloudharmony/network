@@ -114,9 +114,10 @@ class NetworkTest {
    * @param int $size the desired size (bytes)
    * @param string $serviceType optional service type => CDNs will only get 
    * image or javascript test files
+   * @param boolean $quiet supress debug output
    * @return string
    */
-  private function getDownlinkFile($size, $serviceType=NULL) {
+  private function getDownlinkFile($size, $serviceType=NULL, $quiet=FALSE) {
     $ckey = sprintf('%d%s', $size, $serviceType ? $serviceType : '');
     if (!is_array($this->dowlinkFilesCache)) $this->dowlinkFilesCache = array();
     if (isset($this->dowlinkFilesCache[$ckey])) return $this->dowlinkFilesCache[$ckey];
@@ -143,7 +144,7 @@ class NetworkTest {
         $dsize = $s;
       }
     }
-    print_msg(sprintf('Selected downlink file %s [%s MB] for size %s MB', $dfile, round(($dsize/1024)/1024, 2), round(($size/1024)/1024, 2)), $this->verbose, __FILE__, __LINE__);
+    if (!$quiet) print_msg(sprintf('Selected downlink file %s [%s MB] for size %s MB', $dfile, round(($dsize/1024)/1024, 2), round(($size/1024)/1024, 2)), $this->verbose, __FILE__, __LINE__);
     $file = $dfile ? array('name' => $dfile, 
                            'size' => isset($this->options['test_files_dir']) ? filesize(sprintf('%s/%s', $this->options['test_files_dir'], $dfile)) : $dsize) : NULL;
     $this->dowlinkFilesCache[$ckey] = $file;
@@ -480,7 +481,7 @@ class NetworkTest {
                        (preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[1]) ? (size_from_string($pieces[1])*1024)*1024 : NULL)) : $smallest;
             if (!$largest || $largest < $smallest) $largest = $smallest;
             for($size=$smallest; $size<=$largest; $size+=1024) {
-              $f = $this->getDownlinkFile($size);
+              $f = $this->getDownlinkFile($size, NULL, TRUE);
               $tcpFiles[$f['name']] = TRUE;
             }
           }
