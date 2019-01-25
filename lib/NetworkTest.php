@@ -708,7 +708,7 @@ class NetworkTest {
         continue;
       }
       
-      $tests = array_key_exists($i, $this->options['test']) ? $this->options['test'][$i] : $this->options['test'][0];
+      $tests = $this->options['test'];
       $isThroughput = FALSE;
       // replace throughput with downlink + uplink
       if (in_array('throughput', $tests)) {
