@@ -72,6 +72,11 @@ class NetworkTest {
   private $dowlinkFiles;
   
   /**
+   * stores downlink file cache
+   */
+  private $dowlinkFilesCache;
+  
+  /**
    * hash of geo regions
    */
   private $geoRegions;
@@ -112,6 +117,10 @@ class NetworkTest {
    * @return string
    */
   private function getDownlinkFile($size, $serviceType=NULL) {
+    $ckey = sprintf('%d%s', $size, $serviceType ? $serviceType : '');
+    if (!is_array($this->dowlinkFilesCache)) $this->dowlinkFilesCache = array();
+    if (isset($this->dowlinkFilesCache[$ckey])) return $this->dowlinkFilesCache[$ckey];
+    
     if (!isset($this->dowlinkFiles)) {
       $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
     }
@@ -125,7 +134,7 @@ class NetworkTest {
           $pieces = explode('.', $f);
           $ext = $pieces[count($pieces) - 1];
           if (!in_array($ext, array('png', 'jpg', 'gif', 'js'))) {
-            print_msg(sprintf('Skiping test file %s of type %s because it is not supported on CDNs', $f, $ext), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('Skipping test file %s of type %s because it is not supported on CDNs', $f, $ext), $this->verbose, __FILE__, __LINE__);
             continue;
           }
         }
@@ -135,8 +144,10 @@ class NetworkTest {
       }
     }
     print_msg(sprintf('Selected downlink file %s [%s MB] for size %s MB', $dfile, round(($dsize/1024)/1024, 2), round(($size/1024)/1024, 2)), $this->verbose, __FILE__, __LINE__);
-    return $dfile ? array('name' => $dfile, 
+    $file = $dfile ? array('name' => $dfile, 
                           'size' => isset($this->options['test_files_dir']) ? filesize(sprintf('%s/%s', $this->options['test_files_dir'], $dfile)) : $dsize) : NULL;
+    $this->dowlinkFilesCache[$ckey] = $file;
+    return $file;
   }
   
   /**
@@ -306,6 +317,10 @@ class NetworkTest {
           'meta_os' => $sysInfo['os_info'],
           'output' => trim(shell_exec('pwd')),
           'spacing' => 200,
+          'tcp_file' => 'ping.js',
+          'tcp_samples' => 10,
+          'tcp_timeout' => 30,
+          'tcp_uri' => '/web-probe',
           'test' => 'latency',
           'throughput_size' => 5,
           'throughput_threads' => 2,
@@ -362,6 +377,11 @@ class NetworkTest {
           'sleep_before_start:',
           'spacing:',
           'suppress_failed',
+          'tcp_file:',
+          'tcp_header:',
+          'tcp_samples:',
+          'tcp_timeout:',
+          'tcp_uri:',
           'test:',
           'test_cmd_downlink:',
           'test_cmd_downlink_dir:',
@@ -405,7 +425,7 @@ class NetworkTest {
           'traceroute',
           'v' => 'verbose'
         );
-        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_header', 'throughput_webpage'));
+        $this->options = parse_args($opts, array('latency_skip', 'params_url_service_type', 'params_url_header', 'tcp_header', 'test', 'test_endpoint', 'test_instance_id', 'test_location', 'test_provider', 'test_provider_id', 'test_region', 'test_service', 'test_service_id', 'test_service_type', 'throughput_header', 'throughput_webpage'));
         $this->options['run_start'] = time();
         $this->verbose = isset($this->options['verbose']);
         
@@ -443,6 +463,26 @@ class NetworkTest {
           }
           if ($geoRegions) $this->options['geo_regions'] = $geoRegions;
         }
+        
+        // expand tcp_file parameter
+        $tcpFiles = array();
+        $this->options['tcp_file'] = explode(',', $this->options['tcp_file']);
+        foreach(array_keys($this->options['tcp_file']) as $i) {
+          $this->options['tcp_file'][$i] = trim($this->options['tcp_file'][$i]);
+          if ($this->options['tcp_file'][$i] == 'small') $this->options['tcp_file'][$i] = '0-128KB';
+          $pieces = explode('-', $this->options['tcp_file'][$i]);
+          if (is_numeric($pieces[0]) || preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[0]) && count($pieces) <= 2) {
+            $smallest = is_numeric($pieces[0]) ? $pieces[0] : (size_from_string($pieces[0])*1024)*1024;
+            $largest = isset($pieces[1]) ? (is_numeric($pieces[1]) ? $pieces[1] : 
+                       (preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[1]) ? (size_from_string($pieces[1])*1024)*1024 : NULL)) : $smallest;
+            if (!$largest || $largest < $smallest) $largest = $smallest;
+            for($size=$smallest; $size<=$largest; $size+=1024) {
+              $tcpFiles[$this->getDownlinkFile($size)] = TRUE;
+            }
+          }
+          else $tcpFiles[$this->options['tcp_file'][$i]] = TRUE;
+        }
+        $this->options['tcp_file'] = $tcpFiles ? array_keys($tcpFiles) : array('ping.js');
         
         // expand tests
         if (!is_array($this->options['test'])) $this->options['test'] = array($this->options['test']);
@@ -665,6 +705,13 @@ class NetworkTest {
         if (!in_array('uplink', $tests)) $tests[] = 'uplink';
         unset($tests[array_search('throughput', $tests)]);
       }
+      // replace tcp with rtt, ssl and ttfb
+      if (in_array('tcp', $tests)) {
+        if (!in_array('rtt', $tests)) $tests[] = 'rtt';
+        if (!in_array('ssl', $tests)) $tests[] = 'ssl';
+        if (!in_array('ttfb', $tests)) $tests[] = 'ttfb';
+        unset($tests[array_search('tcp', $tests)]);
+      }
       $serviceId = isset($this->options['test_service_id']) ? (array_key_exists($i, $this->options['test_service_id']) ? $this->options['test_service_id'][$i] : $this->options['test_service_id'][0]) : NULL;
       $providerId = isset($this->options['test_provider_id']) ? (array_key_exists($i, $this->options['test_provider_id']) ? $this->options['test_provider_id'][$i] : $this->options['test_provider_id'][0]) : NULL;
       $serviceType = isset($this->options['test_service_type']) ? (array_key_exists($i, $this->options['test_service_type']) ? $this->options['test_service_type'][$i] : $this->options['test_service_type'][0]) : NULL;
@@ -687,6 +734,14 @@ class NetworkTest {
           case 'dns':
             $supportedTests[] = 'dns';
             break;
+        }
+        // rtt, ssl, ttfb
+        if (in_array('downlink', $supportedTests)) {
+          $supportedTests[] = 'rtt';
+          $supportedTests[] = 'ttfb';
+          foreach($endpoints as $endpoint) {
+            if (preg_match('/^https/', $endpoint) || !preg_match('/^http/', $endpoint)) $supportedTests[] = 'ssl';
+          }
         }
         // no tests to run
         $btests = array();
@@ -745,6 +800,13 @@ class NetworkTest {
               break;
             case 'dns':
               $results['dns'] = $this->testDns($endpoints);
+              break;
+            case 'rtt':
+            case 'ttfb':
+            case 'ssl':
+              if ($test != 'ssl' || preg_match('/^https/', $endpoint) || !preg_match('/^http/', $endpoint)) {
+                $results[$test] = $this->testTcp($endpoint, $test);
+              }
               break;
           }
           $testStop = date('Y-m-d H:i:s');
@@ -1318,6 +1380,70 @@ class NetworkTest {
   }
   
   /**
+   * performs a TCP RTT, TTFB or SSL test for $endpoint. returns either an 
+   * array of numeric metrics, or a hash with a 'metrics' key (and may include 
+   * other meta attributes to be included in results for this test). Returns 
+   * NULL if the test failed
+   * @param string $endpoint test endpoint
+   * @param string $test the test to perform - one of rtt, ttfb or ssl
+   * @return array
+   */
+  private function testTcp($endpoint, $test) {
+    $metrics = NULL;
+    // add http(s):// prefix if missing
+    if (!preg_match('/^http/', $endpoint)) $endpoint = sprintf('http%s://%s', $test == 'ssl' ? 's' : '', $endpoint);
+    // add base URI suffix
+    if (!preg_match('/^https?:\/\/.*\//', $endpoint)) $endpoint = sprintf('%s%s%s', $endpoint, substr($this->options['tcp_uri'], 0, 1) != '/' ? '/' : '', $this->options['tcp_uri']);
+    // remove trailing /
+    if (substr($endpoint, -1) == '/') $endpoint = substr($endpoint, 0, strlen($endpoint) - 1);
+    $samples = $this->options['tcp_samples'];
+    $timeout = $this->options['tcp_timeout'];
+    $headers = isset($this->options['tcp_header']) && is_array($this->options['tcp_header']) && $this->options['tcp_header'] ? $this->options['tcp_header'] : array();
+    switch($test) {
+      case 'rtt':
+        $start = 'time_namelookup';
+        $stop = 'time_connect';
+        break;
+      case 'ssl':
+        $start = 'time_connect';
+        $stop = 'time_appconnect';
+        break;
+      case 'ttfb':
+        $start = 'time_pretransfer';
+        $stop = 'time_starttransfer';
+        break;
+    }
+    $cmd = 'curl -s -o /dev/null -w "%{' . $start . '}|%{' . $stop . '}\n"' . (is_numeric($timeout) && $timeout>0 ? ' --max-time ' . $timeout : '');
+    foreach($headers as $header) $cmd .= sprintf(' -H "%s"', $header);
+    $cmd .= sprintf(' "%s/[file]" 2>&1', $endpoint);
+    print_msg(sprintf('Initiating %s testing for %d samples using base URL %s [timeout=%d%s]. Metric will be calculated using %s - %s. Base curl command: %s', 
+              $test, $samples, $endpoint, $timeout, $headers ? '; headers=' . implode(';', $headers) : '', $stop, $start, $cmd), $this->verbose, __FILE__, __LINE__);
+    
+    for($i=1; $i<=$samples; $i++) {
+      $file = $this->options['tcp_uri'][rand(0, count($this->options['tcp_uri']) - 1)];
+      print_msg(sprintf('Testing using test file %s', $file), $this->verbose, __FILE__, __LINE__);
+      $output = trim(shell_exec(str_replace('[file]', $file, $cmd)));
+      $pieces = explode('|', $output);
+      if (count($pieces) == 2 && is_numeric($pieces[0]) && is_numeric($pieces[1]) && $pieces[0] >= 0 && $pieces[1] > 0 && $pieces[1] > $pieces[0]) {
+        if (!is_array($metrics)) {
+          $metrics = array('metrics' => array(), 'tests_failed' => 0, 'tests_success' => 0);
+        }
+        $ms = ($pieces[1] - $pieces[0])*1000;
+        $metrics['metrics'] = $ms;
+        $metrics['tests_success']++;
+        print_msg(sprintf('Test successful with start time %s, end time %s and metric %s. There are %d successful results.', 
+                          $pieces[0], $pieces[1], $ms, $metrics['tests_success']), $this->verbose, __FILE__, __LINE__);
+      }
+      else {
+        $metrics['tests_failed']++;
+        print_msg(sprintf('Test failed - there are %d test failures', $metrics['tests_failed']), $this->verbose, __FILE__, __LINE__, TRUE);
+      }
+    }
+    
+    return $metrics;
+  }
+  
+  /**
    * performs a throughput test for $endpoint. returns either an array of 
    * numeric metrics, or a hash with a 'metrics' key (and may include other 
    * meta attributes to be included in results for this test). returns NULL if 
@@ -1622,6 +1748,8 @@ class NetworkTest {
       'params_url' => array('url' => TRUE),
       'params_url_service_type' => array('option' => get_service_types()),
       'spacing' => array('min' => 0),
+      'tcp_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
+      'tcp_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE),
       'test' => array('required' => TRUE),
       'test_endpoint' => array('required' => TRUE),
       'test_service_type' => array('option' => get_service_types()),
@@ -1643,8 +1771,8 @@ class NetworkTest {
     if (!isset($validated['test'])) {
       foreach($this->options['test'] as $tests) {
         foreach($tests as $test) {
-          if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns'))) {
-            $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns]');
+          if (!in_array($test, array('latency', 'downlink', 'uplink', 'throughput', 'dns', 'rtt', 'ttfb', 'ssl'))) {
+            $validated['test'] = sprintf('--test %s is not valid [must be one of: latency, downlink, uplink, dns, rtt, ttfb, ssl]');
             break;
           }
         }
@@ -1701,6 +1829,17 @@ class NetworkTest {
                                                    $f, $this->options['test_files_dir'], filesize($file), $s);
             break;
           }
+        }
+      }
+    }
+    
+    // validate tcp_file
+    if (isset($this->options['tcp_file'])) {
+      $this->dowlinkFiles = string_to_hash(file_get_contents(dirname(__FILE__) . '/config/downlink-files.ini'));
+      foreach($this->options['tcp_file'] as $file) {
+        if (!isset($this->dowlinkFiles[$file])) {
+          $validated['tcp_file'] = sprintf('--tcp_file %s is not valid', $file);
+          break;
         }
       }
     }
@@ -1809,7 +1948,8 @@ class NetworkTest {
     if (isset($this->options['collectd_rrd'])) $dependencies['zip'] = 'zip';
     foreach($this->options['test'] as $tests) {
       if (in_array('latency', $tests)) $dependencies['ping'] = 'ping';
-      if (in_array('downlink', $tests) || in_array('uplink', $tests) || in_array('throughput', $tests)) $dependencies['curl'] = 'curl';
+      if (in_array('downlink', $tests) || in_array('uplink', $tests) || in_array('throughput', $tests) || 
+          in_array('rtt', $tests) || in_array('ttfb', $tests) || in_array('ssl', $tests)) $dependencies['curl'] = 'curl';
       if (in_array('dns', $tests)) $dependencies['dig'] = 'dig';
     }
     return validate_dependencies($dependencies);

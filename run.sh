@@ -277,6 +277,46 @@ are informational and used in conjunction with use of save.sh
                                          domain in --test_endpoint will be used 
                                          for this testing unless the 
                                          --dns_recursive flag is set
+                              rtt        measure TCP/IP round trip time (RTT).
+                                         Use of this test requires the 
+                                         CloudHarmony web-probe repository be 
+                                         http/https accessible on 
+                                         --test_endpoint (see --throughput_uri) 
+                                         RTT is calculated using curl timing 
+                                         metrics as: 
+                                         rtt = %{time_connect} - %{time_namelookup}
+                                         (metric saved is milliseconds)
+                                         See https://blog.cloudflare.com/a-question-of-timing/
+                              ssl        measure SSL handshake time. Use of 
+                                         this test requires the CloudHarmony 
+                                         web-probe repository be https 
+                                         accessible on --test_endpoint (see 
+                                         --throughput_uri). SSH handshake time 
+                                         is calculated using curl timing 
+                                         metrics as: 
+                                         ssl_time = %{time_appconnect} - %{time_connect}
+                                         (metric saved is milliseconds)
+                                         See https://blog.cloudflare.com/a-question-of-timing/
+                              ttfb       measure time to first byte (TTFB). Use 
+                                         of this test requires the CloudHarmony 
+                                         web-probe repository be http/https 
+                                         accessible on --test_endpoint (see 
+                                         --throughput_uri). TTFB is calculated 
+                                         using curl timing metrics as: 
+                                         ttfb = %{time_starttransfer} - %{time_pretransfer}
+                                         (metric saved is milliseconds). This
+                                         metric will be very close to rtt but 
+                                         also incorporates time spent by the 
+                                         server processing an HTTP GET request.
+                                         The GET URI is determined by 
+                                         throughput_size and 
+                                         throughput_small_file parameters. Use
+                                         the latter for a more random sequence
+                                         of requests. This metric assumes the 
+                                         TCP socket connection has already been 
+                                         established (TCP + SSL handshakes) and 
+                                         disregards any DNS lookup time.
+                                         See https://blog.cloudflare.com/a-question-of-timing/
                             Multiple tests may be specified each separated by a
                             space or comma. If multiple --test_endpoint 
                             parameters are specified, --test may be specified 
