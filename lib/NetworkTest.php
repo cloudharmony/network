@@ -477,7 +477,7 @@ class NetworkTest {
         $this->tcpFiles = array();
         foreach(explode(',', $this->options['tcp_file']) as $file) {
           $file = trim($file);
-          if ($file == 'small') $file = '1-128KB';
+          if ($file == 'small') $file = '8-128KB';
           $pieces = explode('-', $file);
           if (is_numeric($pieces[0]) || preg_match('/^[0-9\.]+\s*[kmgtb]+$/i', $pieces[0]) && count($pieces) <= 2) {
             $smallest = is_numeric($pieces[0]) ? $pieces[0] : (size_from_string($pieces[0])*1024)*1024;
