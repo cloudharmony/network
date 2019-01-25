@@ -1960,7 +1960,7 @@ class NetworkTest {
     foreach($this->options['test'] as $tests) {
       if (in_array('latency', $tests)) $dependencies['ping'] = 'ping';
       if (in_array('downlink', $tests) || in_array('uplink', $tests) || in_array('throughput', $tests) || 
-          in_array('rtt', $tests) || in_array('ttfb', $tests) || in_array('ssl', $tests)) $dependencies['curl'] = 'curl';
+          in_array('rtt', $tests) || in_array('ttfb', $tests) || in_array('ssl', $tests) || in_array('tcp', $tests)) $dependencies['curl'] = 'curl';
       if (in_array('dns', $tests)) $dependencies['dig'] = 'dig';
     }
     return validate_dependencies($dependencies);
