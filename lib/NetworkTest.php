@@ -1159,6 +1159,10 @@ class NetworkTest {
                               $size, $expectedSize, $tempDir, $cmd), $this->verbose, __FILE__, __LINE__, TRUE);
             continue;
           }
+          else {
+            print_msg(sprintf('Successfully generated random %d bytes file %s for uplink testing using command %s. File will be deleted upon test completion.', 
+                              $size, $source, $cmd), $this->verbose, __FILE__, __LINE__);
+          }
         }
         $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
         if (!$url) continue;
