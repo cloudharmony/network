@@ -1149,6 +1149,8 @@ class NetworkTest {
           $source = sprintf('%s/uplink_input_%d', $tempDir, $size);
           if (!file_exists($source)) {
             exec($cmd = sprintf('dd if=/dev/urandom of=%s bs=%d count=%d 2>/dev/null', $source, $size > 1024 ? 1024 : $size, $size > 1024 ? round($size/1024) : 1));
+            print_msg(sprintf('Attempting to generate random %d bytes file for uplink testing using command: %s', 
+                              $size, $cmd), $this->verbose, __FILE__, __LINE__);
             $expectedSize = $size > 1024 ? 1024*round($size/1024) : $size;
             if (file_exists($source) && filesize($source) != $expectedSize) unlink($source);
             if (file_exists($source)) register_shutdown_function('unlink', $source);
@@ -1160,8 +1162,8 @@ class NetworkTest {
             continue;
           }
           else {
-            print_msg(sprintf('Successfully generated random %d bytes file %s for uplink testing using command %s. File will be deleted upon test completion.', 
-                              $size, $source, $cmd), $this->verbose, __FILE__, __LINE__);
+            print_msg(sprintf('Successfully generated random %d bytes file %s. File will be deleted upon test completion.', 
+                              $size, $source), $this->verbose, __FILE__, __LINE__);
           }
         }
         $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
