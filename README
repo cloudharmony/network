@@ -342,13 +342,13 @@ are informational and used in conjunction with saving results (see save.sh)
                                          metrics as: 
                                          ttfb = %{time_starttransfer} - %{time_pretransfer}
                                          (metric saved is milliseconds). This
-                                         metric will be very close to rtt but 
-                                         also incorporates time spent by the 
-                                         server processing an HTTP GET request.
-                                         This metric assumes the TCP socket 
+                                         metric is similar to rtt but 
+                                         incorporates time spent by the server 
+                                         processing an HTTP GET request. This 
+                                         metric assumes the TCP socket 
                                          connection has already been established 
                                          (TCP + SSL handshakes) and disregards 
-                                         any DNS lookup time.
+                                         DNS lookup time.
                                          See https://blog.cloudflare.com/a-question-of-timing/
                               tcp        run all TCP tests - rtt, ssl and ttfb
                             Multiple tests may be specified each separated by a

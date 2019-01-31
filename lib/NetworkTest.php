@@ -1761,7 +1761,7 @@ class NetworkTest {
       'throughput_same_service' => array('max' => 1024, 'min' => 1),
       'throughput_same_state' => array('max' => 1024, 'min' => 1),
       'throughput_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
-      'throughput_size' => array('max' => 1024, 'min' => 0, 'required' => TRUE),
+      'throughput_size' => array('max' => 1048576, 'min' => 0, 'required' => TRUE),
       'throughput_threads' => array('max' => 512, 'min' => 1, 'required' => TRUE),
       'throughput_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE)
     );

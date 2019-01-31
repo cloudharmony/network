@@ -301,22 +301,22 @@ are informational and used in conjunction with use of save.sh
                                          of this test requires the CloudHarmony 
                                          web-probe repository be http/https 
                                          accessible on --test_endpoint (see 
-                                         --throughput_uri). TTFB is calculated 
-                                         using curl timing metrics as: 
+                                         --tcp_* parameters). If a 
+                                         test_endpoint is designated without an 
+                                         http prefix, http will be assumed. 
+                                         TTFB is calculated using curl timing 
+                                         metrics as: 
                                          ttfb = %{time_starttransfer} - %{time_pretransfer}
                                          (metric saved is milliseconds). This
-                                         metric will be very close to rtt but 
-                                         also incorporates time spent by the 
-                                         server processing an HTTP GET request.
-                                         The GET URI is determined by 
-                                         throughput_size and 
-                                         throughput_small_file parameters. Use
-                                         the latter for a more random sequence
-                                         of requests. This metric assumes the 
-                                         TCP socket connection has already been 
-                                         established (TCP + SSL handshakes) and 
-                                         disregards any DNS lookup time.
+                                         metric is similar to rtt but 
+                                         incorporates time spent by the server 
+                                         processing an HTTP GET request. This 
+                                         metric assumes the TCP socket 
+                                         connection has already been established 
+                                         (TCP + SSL handshakes) and disregards 
+                                         DNS lookup time.
                                          See https://blog.cloudflare.com/a-question-of-timing/
+                              tcp        run all TCP tests - rtt, ssl and ttfb
                             Multiple tests may be specified each separated by a
                             space or comma. If multiple --test_endpoint 
                             parameters are specified, --test may be specified 
