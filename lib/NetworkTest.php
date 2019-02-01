@@ -1021,7 +1021,9 @@ class NetworkTest {
           $cmd = str_replace('[dest]', $dest, $cmd);
           $dests[$n] = $dest;
         }
-        if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
+        if (isset($this->options['test_cmd_url_strip'])) {
+          foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
+        }
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
         fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s%s && %s >>%s &\n", 
@@ -1171,7 +1173,9 @@ class NetworkTest {
         $urls[$n] = $url;
         $tfiles[$n] = sprintf('%s.%d.%d', basename($source), $i, rand());
         $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
-        if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
+        if (isset($this->options['test_cmd_url_strip'])) {
+          foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
+        }
         $commands[$n] = $cmd;
         $bytes[$n] = filesize($source);
         $ofile = sprintf('%s.out%d', $cfile, $i);
@@ -1187,7 +1191,9 @@ class NetworkTest {
           $purged = TRUE;
           $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
           $cmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
-          if (isset($this->options['test_cmd_url_strip'])) $cmd = str_replace($this->options['test_cmd_url_strip'], '', $cmd);
+          if (isset($this->options['test_cmd_url_strip'])) {
+            foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
+          }
           fwrite($fp, sprintf("%s &>>/dev/null &\n", $cmd));
         }
       }

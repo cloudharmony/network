@@ -395,7 +395,8 @@ are informational and used in conjunction with use of save.sh
                             argument could be set to 
                             --test_cmd_url_strip ".s3.amazonaws.com" (http://
                             and https:// are automatically removed) to convert 
-                            HTTP URLs to S3 URLs
+                            HTTP URLs to S3 URLs. Multiple strings may be 
+                            specified each separated by a pipe character (|)
                             
 --test_endpoint             REQUIRED: hostname or IP address to perform tests 
                             against. For throughput tests this may include an 
