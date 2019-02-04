@@ -18,7 +18,7 @@
  * Used to manage network testing
  */
 require_once(dirname(__FILE__) . '/benchmark/util.php');
-ini_set('memory_limit', '16m');
+ini_set('memory_limit', '64m');
 date_default_timezone_set('UTC');
 
 class NetworkTest {
