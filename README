@@ -5,6 +5,8 @@ DNS query performance. Common Linux tools including curl, ping and dig are used
 to conduct testing. Test endpoints must have CloudHarmony test files installed 
 on an http/https accessible URI (see https://github.com/cloudharmony/web-probe)
 
+NOTE: When cloning this repository, please use the --recurse-submodules option
+to also pull the https://github.com/cloudharmony/benchmark submodule.
 
 TESTING PARAMETERS
 The following test parameters are supported. Parameters with a 'meta_' prefix 
