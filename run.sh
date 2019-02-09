@@ -349,6 +349,9 @@ are informational and used in conjunction with use of save.sh
   
                               [dest]
                               --test_cmd_downlink "aws s3 cp s3://mybucket/probe/[file] [dest]"
+                              
+                            Command line dash style arguments (e.g. -a / --arg)
+                            must include a leading backslash before each dash
 
 --test_cmd_uplink           Like test_cmd_downlink, but used in place of curl
                             for uplink tests. This command must also contain 
@@ -366,6 +369,9 @@ are informational and used in conjunction with use of save.sh
                             prefix of '/test' for uploaded files:
 
                               --test_cmd_uplink "aws s3 cp [source] s3://mybucket/test/[file]"
+                              
+                            Command line dash style arguments (e.g. -a / --arg)
+                            must include a leading backslash before each dash
 
 --test_cmd_uplink_del       This argument must be used in conjunction with 
                             test_cmd_uplink designating a command to use to 
@@ -386,6 +392,9 @@ are informational and used in conjunction with use of save.sh
   
                               Wildcard (run once per test iteration):
                               --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+                              
+                            Command line dash style arguments (e.g. -a / --arg)
+                            must include a leading backslash before each dash
 
 --test_cmd_url_strip        Optional string to remove from file URL values 
                             (i.e. test_endpoint and throughput_uri arguments). 

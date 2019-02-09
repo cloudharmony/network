@@ -448,6 +448,11 @@ class NetworkTest {
                         'throughput_same_region' => 100, 'throughput_same_state' => 50) as $k => $v) $defaults[$k] = $v;
         }
         
+        // remove leading \ before dashes in certain args
+        foreach(array('test_cmd_downlink', 'test_cmd_uplink', 'test_cmd_uplink_del') as $a) {
+          if (isset($this->options[$a])) $this->options[$a] = str_replace('\-', '-', $this->options[$a]);
+        }
+        
         foreach($defaults as $key => $val) {
           if (!isset($this->options[$key])) {
             $this->options[$key] = $val;
