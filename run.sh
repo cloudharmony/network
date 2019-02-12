@@ -669,9 +669,9 @@ are informational and used in conjunction with use of save.sh
                             load time
                             
 --throughput_timeout        Timeout in seconds for throughput tests. Default is
-                            180 seconds unless --throughput_size is 0 or 
+                            600 seconds unless --throughput_size is 0 or 
                             --throughput_small_file is set in which case it is
-                            5
+                            30
                             
 --throughput_tolerance      The permitted variation between requested and 
                             transferred bytes for a throughput test. Default 
