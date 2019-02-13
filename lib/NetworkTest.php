@@ -1195,11 +1195,11 @@ class NetworkTest {
         if (isset($commands[$n]) && (!$purged || !preg_match('/\*/', $this->options['test_cmd_uplink_del']))) {
           $purged = TRUE;
           $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
-          $cmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
+          $dcmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
           if (isset($this->options['test_cmd_url_strip'])) {
-            foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
+            foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $dcmd = str_replace($strip, '', $dcmd);
           }
-          fwrite($fp, sprintf("%s &>>/dev/null &\n", $cmd));
+          fwrite($fp, sprintf("%s &>>/dev/null &\n", $dcmd));
         }
       }
       fwrite($fp, "wait\n");
