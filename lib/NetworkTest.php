@@ -461,7 +461,7 @@ class NetworkTest {
         }
         if (isset($this->options['throughput_size']) && $this->options['throughput_size'] == 0) $this->options['throughput_time'] = TRUE;
         if (!isset($this->options['throughput_samples'])) $this->options['throughput_samples'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 10 : 5;
-        if (!isset($this->options['throughput_timeout'])) $this->options['throughput_timeout'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 30 : 600;
+        if (!isset($this->options['throughput_timeout'])) $this->options['throughput_timeout'] = isset($this->options['throughput_small_file']) || isset($this->options['throughput_time']) ? 30 : 900;
         
         // throughput tolerance
         if (!isset($this->options['throughput_tolerance']) || !is_numeric($this->options['throughput_tolerance']) || $this->options['throughput_tolerance'] < 0 || $this->options['throughput_tolerance'] > 1) $this->options['throughput_tolerance'] = 0.6;

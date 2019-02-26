@@ -669,7 +669,7 @@ are informational and used in conjunction with use of save.sh
                             load time
                             
 --throughput_timeout        Timeout in seconds for throughput tests. Default is
-                            600 seconds unless --throughput_size is 0 or 
+                            900 seconds unless --throughput_size is 0 or 
                             --throughput_small_file is set in which case it is
                             30
                             
