@@ -1017,11 +1017,18 @@ class NetworkTest {
       $commands = array();
       $dests = array();
       $hasDest = preg_match('/\[dest\]/', $this->options['test_cmd_downlink']);
+      $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_downlink']);
       foreach($requests as $n => $request) {
         $url = trim(str_replace('http://', '', str_replace('https://', '', $request['url'])));
         if (!$url) continue;
         $urls[$n] = $url;
-        $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
+        if ($hasUrl) {
+          $f = basename($url);
+          $u = dirname($url);
+          $cmd = str_replace('[file]', $f, $this->options['test_cmd_downlink']);
+          $cmd = str_replace('[url]', $u, $this->options['test_cmd_downlink']);
+        }
+        else $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
         if ($hasDest) {
           $dest = sprintf('%s/%s.%d.%d', isset($this->options['test_cmd_downlink_dir']) ? $this->options['test_cmd_downlink_dir'] : $tempDir, basename($url), $i, rand());
           $cmd = str_replace('[dest]', $dest, $cmd);
@@ -1145,6 +1152,7 @@ class NetworkTest {
       $commands = array();
       $tfiles = array();
       $bytes = array();
+      $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_uplink']);
       foreach($requests as $n => $request) {
         $source = isset($request['body']) ? $request['body'] : NULL;
         if (!$source) {
@@ -1181,7 +1189,12 @@ class NetworkTest {
         if (!$url) continue;
         $urls[$n] = $url;
         $tfiles[$n] = sprintf('%s.%d.%d', basename($source), $i, rand());
-        $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
+        if ($hasUrl) {
+          $f = basename($url);
+          $u = dirname($url);
+          $cmd = str_replace('[source]', $source, str_replace('[url]', $u, str_replace('[file]', $f, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n])));
+        }
+        else $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
         if (isset($this->options['test_cmd_url_strip'])) {
           foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
         }
