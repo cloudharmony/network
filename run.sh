@@ -358,7 +358,7 @@ are informational and used in conjunction with use of save.sh
                             name, this argument may contain a [url] substring. 
                             For example:
                             
-                            --test_cmd_downlink "export AZURE_STORAGE_ACCOUNT=[url] && az storage blob download \-f [dest] \-c MyContainer -n [file]"
+                            --test_cmd_downlink "az storage blob download \-\-account\-name [url] \-f [dest] \-c MyContainer \-n [file]"
                             
 --test_cmd_downlink_bytes   Set this flag if --test_cmd_downlink outputs the 
                             number of bytes transferred to stdout on success. 
@@ -397,7 +397,7 @@ are informational and used in conjunction with use of save.sh
                             name, this argument may contain a [url] substring. 
                             For example:
                             
-                            --test_cmd_uplink "export AZURE_STORAGE_ACCOUNT=[url] && az storage blob upload \-f [source] \-c MyContainer -n [file]"
+                            --test_cmd_uplink "az storage blob upload \-\-account\-name [url] \-f [source] \-c MyContainer \-n [file]"
 
 --test_cmd_uplink_del       This argument must be used in conjunction with 
                             test_cmd_uplink designating a command to use to 

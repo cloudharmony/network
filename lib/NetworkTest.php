@@ -1026,7 +1026,7 @@ class NetworkTest {
           $f = basename($url);
           $u = dirname($url);
           $cmd = str_replace('[file]', $f, $this->options['test_cmd_downlink']);
-          $cmd = str_replace('[url]', $u, $this->options['test_cmd_downlink']);
+          $cmd = str_replace('[url]', $u, $cmd);
         }
         else $cmd = str_replace('[file]', $url, $this->options['test_cmd_downlink']);
         if ($hasDest) {
