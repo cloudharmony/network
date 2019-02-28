@@ -1212,7 +1212,10 @@ class NetworkTest {
         if (isset($commands[$n]) && (!$purged || !preg_match('/\*/', $this->options['test_cmd_uplink_del']))) {
           $purged = TRUE;
           $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
-          $dcmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
+          if ($hasUrl) {
+            $dcmd = str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]));
+          }
+          else $dcmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
           if (isset($this->options['test_cmd_url_strip'])) {
             foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $dcmd = str_replace($strip, '', $dcmd);
           }

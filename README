@@ -452,6 +452,13 @@ are informational and used in conjunction with saving results (see save.sh)
                               
                             Command line dash style arguments (e.g. -a / --arg)
                             must include a leading backslash before each dash
+                            
+                            Alternatively, if the URL portion (test_endpoint and 
+                            throughput_uri) should be separate from the file 
+                            name, this argument may contain a [url] substring. 
+                            For example:
+                            
+                            --test_cmd_uplink_del "az storage blob delete \-\-account\-name [url] \-c MyContainer \-n [file] \-\-no\-progress"
 
 * test_cmd_url_strip        Optional string to remove from file URL values 
                             (i.e. test_endpoint and throughput_uri arguments). 
