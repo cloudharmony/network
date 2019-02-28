@@ -1190,9 +1190,7 @@ class NetworkTest {
         $urls[$n] = $url;
         $tfiles[$n] = sprintf('%s.%d.%d', basename($source), $i, rand());
         if ($hasUrl) {
-          $f = basename($url);
-          $u = dirname($url);
-          $cmd = str_replace('[source]', $source, str_replace('[url]', $u, str_replace('[file]', $f, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n])));
+          $cmd = str_replace('[source]', $source, str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink'] . '/' . $tfiles[$n])));
         }
         else $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
         if (isset($this->options['test_cmd_url_strip'])) {
