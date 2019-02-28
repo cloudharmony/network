@@ -1190,7 +1190,7 @@ class NetworkTest {
         $urls[$n] = $url;
         $tfiles[$n] = sprintf('%s.%d.%d', basename($source), $i, rand());
         if ($hasUrl) {
-          $cmd = str_replace('[source]', $source, str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink'] . '/' . $tfiles[$n])));
+          $cmd = str_replace('[source]', $source, str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink'])));
         }
         else $cmd = str_replace('[source]', $source, str_replace('[file]', $url, $this->options['test_cmd_uplink'] . '/' . $tfiles[$n]));
         if (isset($this->options['test_cmd_url_strip'])) {
@@ -1211,7 +1211,7 @@ class NetworkTest {
           $purged = TRUE;
           $url = trim(str_replace('/up.html', '', str_replace('http://', '', str_replace('https://', '', $request['url']))));
           if ($hasUrl) {
-            $dcmd = str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]));
+            $dcmd = str_replace('[url]', $url, str_replace('[file]', $tfiles[$n], $this->options['test_cmd_uplink_del']));
           }
           else $dcmd = str_replace('[file]', $url, $this->options['test_cmd_uplink_del'] . '/' . $tfiles[$n]);
           if (isset($this->options['test_cmd_url_strip'])) {
