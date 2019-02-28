@@ -390,6 +390,7 @@ class NetworkTest {
           'tcp_uri:',
           'test:',
           'test_cmd_downlink:',
+          'test_cmd_downlink_bytes',
           'test_cmd_downlink_dir:',
           'test_cmd_uplink:',
           'test_cmd_uplink_del:',
@@ -1032,7 +1033,10 @@ class NetworkTest {
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
         fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s%s && %s >>%s &\n", 
-                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, $hasDest ? ' 1>/dev/null' : ' | wc -c >>' . $ofile . ' 2>/dev/null', 'date +%s%N', $ofile));
+                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, 
+                            $hasDest ? ' 1>/dev/null' : (isset($this->options['test_cmd_downlink_bytes']) ? ' >>' : ' | wc -c >>') . $ofile . ' 2>/dev/null', 
+                            'date +%s%N', $ofile));
+        
         $i++;
       }
       fwrite($fp, "wait\n");

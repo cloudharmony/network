@@ -352,6 +352,18 @@ are informational and used in conjunction with use of save.sh
                               
                             Command line dash style arguments (e.g. -a / --arg)
                             must include a leading backslash before each dash
+                            
+--test_cmd_downlink_bytes   Set this flag if --test_cmd_downlink outputs the 
+                            number of bytes transferred to stdout on success. 
+                            When used, do not include [dest] in the 
+                            --test_cmd_downlink argument
+                              
+--test_cmd_downlink_dir     If test_cmd_downlink contains [dest], this 
+                            parameter may be set to specify an alternate 
+                            directory to write temporary downloaded files to
+                            (in place of the default 'output' directory). If 
+                            set, this directory must be writeable to the test
+                            process
 
 --test_cmd_uplink           Like test_cmd_downlink, but used in place of curl
                             for uplink tests. This command must also contain 
