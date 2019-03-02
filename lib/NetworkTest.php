@@ -47,6 +47,12 @@ class NetworkTest {
   const SMALL_FILE_LIMIT = 131072;
   
   /**
+   * Test files to skip when validating the test_files_dir parameter if they do
+   * not exist
+   */
+  const TEST_FILES_DIR_SKIP_VALIDATION = 'test1gb.bin,test10gb.bin';
+  
+  /**
    * set to TRUE if abort_threshold reached
    */
   private $aborted = FALSE;
@@ -1856,10 +1862,15 @@ class NetworkTest {
           foreach($this->dowlinkFiles as $f => $s) {
             $file = sprintf('%s/%s', $dir, $f);
             if (!file_exists($file)) {
-              $validated['test_files_dir'] = sprintf('--test_files_dir %s does not contain the file %s', $dir, $f);
-              break;
+              if (in_array($f, explode(',', self::TEST_FILES_DIR_SKIP_VALIDATION))) {
+                print_msg(sprintf('Skipping validation of test file %s in dir %s', $f, $dir), $this->verbose, __FILE__, __LINE__);
+              }
+              else {
+                $validated['test_files_dir'] = sprintf('--test_files_dir %s does not contain the file %s', $dir, $f);
+                break;
+              }
             }
-            else if ((abs($s - filesize($file))/$s) > 0.1) {
+            else if ($s && (abs($s - filesize($file))/$s) > 0.1) {
               $validated['test_files_dir'] = sprintf('The test file %s in --test_files_dir %s is more than 10% different in size from expected (%d vs %d)', 
                                                      $f, $dir, filesize($file), $s);
               break;
