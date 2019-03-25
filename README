@@ -389,7 +389,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             name, this argument may contain a [url] substring. 
                             For example:
                             
-                            --test_cmd_downlink "az storage blob download \-\-account\-name [url] \-f [dest] \-c MyContainer \-n [file] \-\-no\-progress"
+                            --test_cmd_downlink "azcopy copy https://[url]/[file]<your sas> >/dev/stdout"
                             
 * test_cmd_downlink_bytes   Set this flag if --test_cmd_downlink outputs the 
                             number of bytes transferred to stdout on success. 
@@ -428,7 +428,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             name, this argument may contain a [url] substring. 
                             For example:
                             
-                            --test_cmd_uplink "az storage blob upload \-\-account\-name [url] \-f [source] \-c MyContainer \-n [file] \-\-no\-progress"
+                            --test_cmd_uplink "azcopy copy [source] https://[file]<your sas>"
 
 * test_cmd_uplink_del       This argument must be used in conjunction with 
                             test_cmd_uplink designating a command to use to 
@@ -448,7 +448,7 @@ are informational and used in conjunction with saving results (see save.sh)
                               --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/[file]"
                               
                               Wildcard (run once per test iteration):
-                              --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ --recursive --include '*'"
+                              --test_cmd_uplink_del "aws s3 rm s3://mybucket/test/ \-\-recursive \-\-include '*'"
                               
                             Command line dash style arguments (e.g. -a / --arg)
                             must include a leading backslash before each dash
@@ -458,7 +458,7 @@ are informational and used in conjunction with saving results (see save.sh)
                             name, this argument may contain a [url] substring. 
                             For example:
                             
-                            --test_cmd_uplink_del "az storage blob delete \-\-account\-name [url] \-c MyContainer \-n [file] \-\-no\-progress"
+                            --test_cmd_uplink_del "azcopy remove https://[file]<your sas>"
 
 * test_cmd_url_strip        Optional string to remove from file URL values 
                             (i.e. test_endpoint and throughput_uri arguments). 
