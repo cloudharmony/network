@@ -1271,6 +1271,7 @@ class NetworkTest {
           if (isset($this->options['test_cmd_url_strip'])) {
             foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $dcmd = str_replace($strip, '', $dcmd);
           }
+          if ($hasToken) $dcmd = str_replace('[token]', $token, $dcmd);
           fwrite($fp, sprintf("%s &>>/dev/null &\n", $dcmd));
         }
       }
