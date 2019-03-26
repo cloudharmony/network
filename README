@@ -441,7 +441,6 @@ are informational and used in conjunction with saving results (see save.sh)
                             Alternatively, if the URL portion (test_endpoint and 
                             throughput_uri) should be separate from the file 
                             name, this argument may contain a [url] substring. 
-                            For example:
                             
                             --test_cmd_uplink "azcopy copy [source] https://[file]<your sas>"
 
