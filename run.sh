@@ -371,6 +371,9 @@ are informational and used in conjunction with use of save.sh
                             (in place of the default 'output' directory). If 
                             set, this directory must be writeable to the test
                             process
+                            
+--test_cmd_downlink_sleep   Optional seconds to sleep between each uplink 
+                            command. Maybe be a fractional value
                                                       
 --test_cmd_token            This parameter may be optionally set to one or more 
                             tokens for use in conjunction with 
@@ -443,6 +446,9 @@ are informational and used in conjunction with use of save.sh
                             For example:
                             
                             --test_cmd_uplink_del "az storage blob delete \-\-account\-name [url] \-c MyContainer \-n [file] \-\-no\-progress"
+                            
+--test_cmd_uplink_sleep     Optional seconds to sleep between each uplink 
+                            command. Maybe be a fractional value
 
 --test_cmd_url_strip        Optional string to remove from file URL values 
                             (i.e. test_endpoint and throughput_uri arguments). 

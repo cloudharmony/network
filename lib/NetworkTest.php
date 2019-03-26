@@ -438,9 +438,11 @@ class NetworkTest {
           'test_cmd_downlink:',
           'test_cmd_downlink_bytes',
           'test_cmd_downlink_dir:',
+          'test_cmd_downlink_sleep:',
           'test_cmd_token:',
           'test_cmd_uplink:',
           'test_cmd_uplink_del:',
+          'test_cmd_uplink_sleep:',
           'test_cmd_url_strip:',
           'test_endpoint:',
           'test_files_dir:',
@@ -1068,6 +1070,7 @@ class NetworkTest {
       $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_downlink']);
       $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_downlink']);
+      $sleep = isset($this->options['test_cmd_downlink_sleep']) ? $this->options['test_cmd_downlink_sleep'] : 0;
       foreach($requests as $n => $request) {
         $url = trim(str_replace('http://', '', str_replace('https://', '', $request['url'])));
         if (!$url) continue;
@@ -1094,7 +1097,7 @@ class NetworkTest {
                             'date +%s%N', $ofile, $timeout, $cmd, $ofile, 
                             $hasDest ? ' 1>/dev/null' : (isset($this->options['test_cmd_downlink_bytes']) ? ' >>' : ' | wc -c >>') . $ofile . ' 2>/dev/null', 
                             'date +%s%N', $ofile));
-        
+        if ($sleep) fwrite($fp, sprintf("sleep %s\n", $sleep));
         $i++;
       }
       fwrite($fp, "wait\n");
@@ -1206,6 +1209,7 @@ class NetworkTest {
       $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_uplink']);
       $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_uplink']);
+      $sleep = isset($this->options['test_cmd_downlink_sleep']) ? $this->options['test_cmd_downlink_sleep'] : 0;
       foreach($requests as $n => $request) {
         $source = isset($request['body']) ? $request['body'] : NULL;
         if (!$source) {
@@ -1255,6 +1259,7 @@ class NetworkTest {
         $ofile = sprintf('%s.out%d', $cfile, $i);
         fwrite($fp, sprintf("%s >%s && timeout %d %s &>/dev/null && %s >>%s &\n", 
                             'date +%s%N', $ofile, $timeout, $cmd, 'date +%s%N', $ofile));
+        if ($sleep) fwrite($fp, sprintf("sleep %s\n", $sleep));
         $i++;
       }
       fwrite($fp, "wait\n");
@@ -1273,6 +1278,7 @@ class NetworkTest {
           }
           if ($hasToken) $dcmd = str_replace('[token]', $token, $dcmd);
           fwrite($fp, sprintf("%s &>>/dev/null &\n", $dcmd));
+          if ($sleep) fwrite($fp, sprintf("sleep %s\n", $sleep));
         }
       }
       fwrite($fp, "wait\n");
@@ -1840,6 +1846,8 @@ class NetworkTest {
       'tcp_samples' => array('max' => 100, 'min' => 1, 'required' => TRUE),
       'tcp_timeout' => array('max' => 600, 'min' => 1, 'required' => TRUE),
       'test' => array('required' => TRUE),
+      'test_cmd_downlink_sleep' => array('min' => 0),
+      'test_cmd_uplink_sleep' => array('min' => 0),
       'test_endpoint' => array('required' => TRUE),
       'test_service_type' => array('option' => get_service_types()),
       'throughput_same_continent' => array('max' => 1024, 'min' => 1),

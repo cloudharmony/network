@@ -403,6 +403,9 @@ are informational and used in conjunction with saving results (see save.sh)
                             set, this directory must be writeable to the test
                             process
                             
+* test_cmd_downlink_sleep   Optional seconds to sleep between each uplink 
+                            command. Maybe be a fractional value
+                            
 * test_cmd_token            This parameter may be optionally set to one or more 
                             tokens for use in conjunction with 
                             test_cmd_downlink, test_cmd_uplink and 
@@ -473,6 +476,9 @@ are informational and used in conjunction with saving results (see save.sh)
                             For example:
                             
                             --test_cmd_uplink_del "azcopy remove https://[file]<your sas>"
+                            
+* test_cmd_uplink_sleep     Optional seconds to sleep between each uplink 
+                            command. Maybe be a fractional value
 
 * test_cmd_url_strip        Optional string to remove from file URL values 
                             (i.e. test_endpoint and throughput_uri arguments). 
