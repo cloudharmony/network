@@ -98,6 +98,11 @@ class NetworkTest {
   private $results = array();
   
   /**
+   * Set to the current test service if set
+   */
+  private $testServiceId;
+  
+  /**
    * Files to use for TCP testing (rtt, ttfb, ssl)
    */
   private $tcpFiles;
@@ -236,6 +241,41 @@ class NetworkTest {
       foreach(array_keys($this->geoRegions) as $region) $this->geoRegions[$region] = explode('|', $this->geoRegions[$region]);
     }
     return $this->geoRegions;
+  }
+  
+  /**
+   * Returns the token value (as specified by the test_cmd_downlink_dir 
+   * parameter) for the $testServiceId specified. Returns NULL if no 
+   * tokens were specified for this service. If only 1 tokens is specified,
+   * then that value will be returned always
+   * @param string $testServiceId ID of the service to return the token for
+   * @return string
+   */
+  private function getTestCmdToken($testServiceId=NULL) {
+    $token = NULL;
+    if (!isset($this->_tokens) && isset($this->options['test_cmd_token'])) {
+      $this->_tokens = array();
+      foreach(explode('|', $this->options['test_cmd_token']) as $t) {
+        $t = trim($t);
+        if (preg_match('/^([^=]+)=(.*)$/', $t, $m)) {
+          $this->_tokens[$m[1]] = $m[2];
+        }
+        else {
+          $this->_tokens = $t;
+          break;
+        }
+      }
+      if ($this->_tokens) print_msg(sprintf('Parsed token list: %s', json_encode($this->_tokens)), $this->verbose, __FILE__, __LINE__);
+    }
+    if ($this->_tokens) {
+      $keys = is_array($this->_tokens) ? array_keys($this->_tokens) : NULL;
+      if (!is_array($this->_tokens)) $token = $this->_tokens;
+      else if ($testServiceId && is_array($this->_tokens) && isset($this->_tokens[$testServiceId])) $token = $this->_tokens[$testServiceId];
+      else if (!$testServiceId) $token = $this->_tokens[$keys[0]];
+      
+      if ($token) print_msg(sprintf('Returning token "%s" for service %s', $token, $testServiceId ? $testServiceId : 'NA'), $this->verbose, __FILE__, __LINE__);
+    }
+    return $token;
   }
   
   /**
@@ -398,6 +438,7 @@ class NetworkTest {
           'test_cmd_downlink:',
           'test_cmd_downlink_bytes',
           'test_cmd_downlink_dir:',
+          'test_cmd_token:',
           'test_cmd_uplink:',
           'test_cmd_uplink_del:',
           'test_cmd_url_strip:',
@@ -797,6 +838,7 @@ class NetworkTest {
             print_msg(sprintf('Skipping private network endpoint %s because services are not related', $endpoint), $this->verbose, __FILE__, __LINE__);
             continue;
           }
+          $this->testServiceId = $serviceId;
           $testStart = date('Y-m-d H:i:s');
           $testStartTimestamp = microtime(TRUE);
           switch($test) {
@@ -1023,6 +1065,8 @@ class NetworkTest {
       $commands = array();
       $dests = array();
       $hasDest = preg_match('/\[dest\]/', $this->options['test_cmd_downlink']);
+      $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_downlink']);
+      $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_downlink']);
       foreach($requests as $n => $request) {
         $url = trim(str_replace('http://', '', str_replace('https://', '', $request['url'])));
@@ -1043,6 +1087,7 @@ class NetworkTest {
         if (isset($this->options['test_cmd_url_strip'])) {
           foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
         }
+        if ($hasToken) $cmd = str_replace('[token]', $token, $cmd);
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
         fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s%s && %s >>%s &\n", 
@@ -1158,6 +1203,8 @@ class NetworkTest {
       $commands = array();
       $tfiles = array();
       $bytes = array();
+      $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_uplink']);
+      $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_uplink']);
       foreach($requests as $n => $request) {
         $source = isset($request['body']) ? $request['body'] : NULL;
@@ -1202,6 +1249,7 @@ class NetworkTest {
         if (isset($this->options['test_cmd_url_strip'])) {
           foreach(explode('|', $this->options['test_cmd_url_strip']) as $strip) $cmd = str_replace($strip, '', $cmd);
         }
+        if ($hasToken) $cmd = str_replace('[token]', $token, $cmd);
         $commands[$n] = $cmd;
         $bytes[$n] = filesize($source);
         $ofile = sprintf('%s.out%d', $cfile, $i);

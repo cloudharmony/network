@@ -371,6 +371,21 @@ are informational and used in conjunction with use of save.sh
                             (in place of the default 'output' directory). If 
                             set, this directory must be writeable to the test
                             process
+                                                      
+--test_cmd_token            This parameter may be optionally set to one or more 
+                            tokens for use in conjunction with 
+                            test_cmd_downlink, test_cmd_uplink and 
+                            test_cmd_uplink_del whereby the string [token] will 
+                            be replaced by the value specified by this 
+                            parameter. If more than 1 tokens are set, they 
+                            should be delimited by a pipe character (|) and 
+                            prefixed with [test_service_id]=. For example, if 
+                            2 tokens, token1 and token2, were specified by this 
+                            parameter, one for test service ID azure:storage, 
+                            and the second for test service ID azure:plob, this
+                            parameter would be set to:
+  
+                              --test_cmd_token "azure:storage=token1|azure:plob=token2"
 
 --test_cmd_uplink           Like test_cmd_downlink, but used in place of curl
                             for uplink tests. This command must also contain 
