@@ -1209,7 +1209,7 @@ class NetworkTest {
       $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_uplink']);
       $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_uplink']);
-      $sleep = isset($this->options['test_cmd_downlink_sleep']) ? $this->options['test_cmd_downlink_sleep'] : 0;
+      $sleep = isset($this->options['test_cmd_uplink_sleep']) ? $this->options['test_cmd_uplink_sleep'] : 0;
       foreach($requests as $n => $request) {
         $source = isset($request['body']) ? $request['body'] : NULL;
         if (!$source) {
