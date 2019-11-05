@@ -910,7 +910,7 @@ class NetworkTest {
             // calculate metric statistical values
             $row['samples'] = count($row['metrics']);
             $lowerBetter = $test == 'latency' || $test == 'dns' || isset($this->options['throughput_time']);
-            $orderedMetrics = implode(' ', $row['metrics']);
+            $orderedMetrics = implode('|', $row['metrics']);
             $lowerBetter ? rsort($row['metrics']) : sort($row['metrics']);
             $discardSlowest = isset($this->options['discard_slowest']) ? $this->options['discard_slowest'] : 0;
             $discardFastest = isset($this->options['discard_fastest']) ? $this->options['discard_fastest'] : 0;
