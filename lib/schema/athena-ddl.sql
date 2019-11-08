@@ -7,7 +7,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS [your database].network (
   meta_compute_service VARCHAR(32),
   meta_compute_service_id VARCHAR(24),
   meta_cpu VARCHAR(32),
-  meta_cpu_cache VARCHAR(32),
+  meta_cpu_cores SMALLINT,
   meta_geo_region VARCHAR(32),
   meta_hostname VARCHAR(64),
   meta_instance_id VARCHAR(96),
