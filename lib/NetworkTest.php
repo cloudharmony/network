@@ -1068,6 +1068,7 @@ class NetworkTest {
       $dests = array();
       $hasDest = preg_match('/\[dest\]/', $this->options['test_cmd_downlink']);
       $hasToken = preg_match('/\[token\]/', $this->options['test_cmd_downlink']);
+      $hasStdErrRedirection = preg_match('/2>/', $this->options['test_cmd_downlink']);
       $token = $hasToken ? $this->getTestCmdToken($this->testServiceId) : '';
       $hasUrl = preg_match('/\[url\]/', $this->options['test_cmd_downlink']);
       $sleep = isset($this->options['test_cmd_downlink_sleep']) ? $this->options['test_cmd_downlink_sleep'] : 0;
@@ -1093,8 +1094,8 @@ class NetworkTest {
         if ($hasToken) $cmd = str_replace('[token]', $token, $cmd);
         $commands[$n] = $cmd;
         $ofile = sprintf('%s.out%d', $cfile, $i);
-        fwrite($fp, sprintf("%s >%s && timeout %d %s 2>>%s%s && %s >>%s &\n", 
-                            'date +%s%N', $ofile, $timeout, $cmd, $ofile, 
+        fwrite($fp, sprintf("%s >%s && timeout %d %s%s%s && %s >>%s &\n", 
+                            'date +%s%N', $ofile, $timeout, $cmd, $hasStdErrRedirection ? '' : ' 2>>' . $ofile, 
                             $hasDest ? ' 1>/dev/null' : (isset($this->options['test_cmd_downlink_bytes']) ? ' >>' : ' | wc -c >>') . $ofile . ' 2>/dev/null', 
                             'date +%s%N', $ofile));
         if ($sleep) fwrite($fp, sprintf("sleep %s\n", $sleep));
