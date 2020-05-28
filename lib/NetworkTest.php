@@ -1930,7 +1930,7 @@ class NetworkTest {
             }
             else if ($s && (abs($s - filesize($file))/$s) > 0.1) {
               $validated['test_files_dir'] = sprintf('The test file %s in --test_files_dir %s is more than 10% different in size from expected (%d vs %d)', 
-                                                     $f, $dir, filesize($file), $s);
+                                                     $f, $dir, filesize($file), (int)$s);
               break;
             }
           }
