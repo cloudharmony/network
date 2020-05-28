@@ -50,7 +50,7 @@ class NetworkTest {
    * Test files to skip when validating the test_files_dir parameter if they do
    * not exist
    */
-  const TEST_FILES_DIR_SKIP_VALIDATION = 'test1gb.bin,test10gb.bin';
+  const TEST_FILES_DIR_SKIP_VALIDATION = 'test500mb.bin,test1gb.bin,test10gb.bin';
   
   /**
    * set to TRUE if abort_threshold reached
@@ -1723,7 +1723,7 @@ class NetworkTest {
         
         if ($response) {
           if (isset($response['lowest_status']) && isset($response['highest_status']) && isset($response['results']) && count($response['results'])) {
-            if ($response['lowest_status'] >= 200 && $response['highest_status'] < 300) {
+            if ($response['lowest_status'] >= 100 && $response['highest_status'] < 300) {
               print_msg(sprintf('curl request(s) for samples %d of %d completed successfully - highest response status is %d and %d results exist', $i+1, $samples, $response['highest_status'], count($response['results'])), $this->verbose, __FILE__, __LINE__);
               $speeds = array();
               $times = array();
@@ -1769,7 +1769,7 @@ class NetworkTest {
                 print_msg(sprintf('Test sample %d of %d for URL %s successful. Mean/median rate is [%s %s] Mb/s. Mean/median time is [%s %s] ms. Total rate is %s Mb/s. Total time is %s secs. Slowest thread was %s secs. Fastest thread was %s secs. %s MB transfer on %d reqs', $i+1, $samples, $url, $meanMbs, $medianMbs, $meanTime, $medianTime, round($totalMbs, 4), round($totalTime/1000, 4), round($slowestThread/1000, 4), round($fastestThread/1000, 4), $mbTransferred, $numRequests), $this->verbose, __FILE__, __LINE__);
               }
             }
-            else print_msg(sprintf('curl request(s) failed for URL %s because lowest and highest status %d/%d is not in the 2XX range', $url, $response['lowest_status'], $response['highest_status']), $this->verbose, __FILE__, __LINE__, TRUE);
+            else print_msg(sprintf('curl request(s) failed for URL %s because lowest and highest status %d/%d is not in the 1XX-2XX range', $url, $response['lowest_status'], $response['highest_status']), $this->verbose, __FILE__, __LINE__, TRUE);
           }
           else print_msg(sprintf('curl request(s) did not return highest_status or results for URL %s', $url), $this->verbose, __FILE__, __LINE__, TRUE);
         }
